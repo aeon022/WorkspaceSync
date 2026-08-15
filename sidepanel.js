@@ -73,8 +73,8 @@ chrome.tabs.onCreated.addListener(renderLocalWorkspaces);
 chrome.tabs.onRemoved.addListener(renderLocalWorkspaces);
 chrome.tabs.onUpdated.addListener(renderLocalWorkspaces);
 
-import { loadHandle } from './lib/handleStore.js';
-import { verifyPermission, scanSyncFolder } from './lib/syncFolder.js';
+import { loadHandle, saveHandle } from './lib/handleStore.js';
+import { verifyPermission, scanSyncFolder, pickSyncFolder } from './lib/syncFolder.js';
 
 const remoteList = document.getElementById('remoteDevices');
 
@@ -147,3 +147,34 @@ async function getOwnDeviceId() {
 
 renderRemoteDevices();
 setInterval(renderRemoteDevices, 15000);
+
+const folderBanner = document.getElementById('folderBanner');
+
+async function renderFolderBanner() {
+  const handle = await loadHandle();
+  folderBanner.style.display = 'none';
+  folderBanner.innerHTML = '';
+
+  if (!handle) {
+    folderBanner.textContent = 'No sync folder configured yet — set one up in Options.';
+    folderBanner.style.display = 'block';
+    return;
+  }
+
+  if (!(await verifyPermission(handle, false))) {
+    folderBanner.textContent = 'Sync folder permission was lost. ';
+    const btn = document.createElement('button');
+    btn.textContent = 'Reconnect';
+    btn.addEventListener('click', async () => {
+      const newHandle = await pickSyncFolder();
+      await saveHandle(newHandle);
+      await renderFolderBanner();
+      await renderRemoteDevices();
+    });
+    folderBanner.append(btn);
+    folderBanner.style.display = 'block';
+  }
+}
+
+renderFolderBanner();
+setInterval(renderFolderBanner, 15000);
