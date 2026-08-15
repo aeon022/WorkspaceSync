@@ -118,6 +118,13 @@ view.
   close tabs that were closed remotely and are still open locally. This
   event-log replay (not full-snapshot diffing) avoids reopening a tab the
   user just deliberately closed.
+- **Dedup by URL**: "missing locally" is a URL comparison against the
+  current local tab set, not just against replayed events. If both devices
+  independently already have the same URL open in the mirrored workspace
+  (e.g. both were opened before mirroring was turned on, or a coincidence),
+  no duplicate tab is created — the existing local tab is treated as
+  already-synced. This applies on every tick, not just at mirror-enable
+  time, so a coincidental duplicate self-resolves within a minute.
   `ponytail: last-write-wins on genuine concurrent edits, no CRDT — fine
   for 2-3 personal devices, upgrade path is a proper CRDT/vector-clock
   merge if conflicts start happening in practice.`
