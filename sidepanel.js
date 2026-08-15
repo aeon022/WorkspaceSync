@@ -3,13 +3,16 @@
 import { getLocalWorkspaces } from './lib/workspace.js';
 import { getLabels, setLabel } from './lib/labels.js';
 import { isMirrored, setMirrored } from './lib/mirrorState.js';
+import { getOrCreateDevice } from './lib/device.js';
+import { loadHandle, saveHandle } from './lib/handleStore.js';
+import { verifyPermission, scanSyncFolder, pickSyncFolder } from './lib/syncFolder.js';
 
 const localList = document.getElementById('localWorkspaces');
 
 async function collectRemoteLabels() {
   const handle = await loadHandle();
   if (!handle || !(await verifyPermission(handle, false))) return new Set();
-  const { devices } = await scanSyncFolder(handle, await getOwnDeviceId());
+  const { devices } = await scanSyncFolder(handle, (await getOrCreateDevice()).id);
   const labels = new Set();
   for (const device of devices) {
     for (const ws of device.workspaces || []) {
@@ -20,11 +23,13 @@ async function collectRemoteLabels() {
 }
 
 async function renderLocalWorkspaces() {
-  const [workspaces, labels, remoteLabels] = await Promise.all([
+  const [workspaces, labels, remoteLabels, suggestedNamesResult] = await Promise.all([
     getLocalWorkspaces(),
     getLabels(),
-    collectRemoteLabels()
+    collectRemoteLabels(),
+    chrome.storage.local.get('suggestedNames')
   ]);
+  const suggestedNames = suggestedNamesResult.suggestedNames || {};
   localList.innerHTML = '';
 
   for (const ws of workspaces) {
@@ -35,8 +40,7 @@ async function renderLocalWorkspaces() {
     input.type = 'text';
     input.placeholder = 'Name this workspace…';
     const currentLabel = labels[ws.workspaceId] || '';
-    const { suggestedNames } = await chrome.storage.local.get('suggestedNames');
-    input.value = currentLabel || (suggestedNames || {})[ws.workspaceId] || '';
+    input.value = currentLabel || suggestedNames[ws.workspaceId] || '';
 
     const count = document.createElement('span');
     count.className = 'count';
@@ -72,10 +76,12 @@ async function renderLocalWorkspaces() {
 renderLocalWorkspaces();
 chrome.tabs.onCreated.addListener(renderLocalWorkspaces);
 chrome.tabs.onRemoved.addListener(renderLocalWorkspaces);
-chrome.tabs.onUpdated.addListener(renderLocalWorkspaces);
-
-import { loadHandle, saveHandle } from './lib/handleStore.js';
-import { verifyPermission, scanSyncFolder, pickSyncFolder } from './lib/syncFolder.js';
+// Deliberately no chrome.tabs.onUpdated listener here: it fires many times
+// per page load for every tab (status/title/favicon), and renderLocalWorkspaces
+// does a full sync-folder disk scan plus a DOM rebuild — that would wipe the
+// label input's focus while the user is typing, on any background tab load.
+// onCreated/onRemoved cover the thing that actually matters (workspace tab
+// counts), and the 15s polling below covers eventual title/favicon drift.
 
 const remoteList = document.getElementById('remoteDevices');
 
@@ -90,7 +96,7 @@ async function renderRemoteDevices() {
     return;
   }
 
-  const { devices, pending } = await scanSyncFolder(handle, (await getOwnDeviceId()));
+  const { devices, pending } = await scanSyncFolder(handle, (await getOrCreateDevice()).id);
   remoteList.innerHTML = '';
 
   for (const name of pending) {
@@ -113,16 +119,16 @@ async function renderRemoteDevices() {
 
       const label = ws.label || '(unlabeled)';
       const openAllBtn = document.createElement('button');
-      openAllBtn.textContent = `Open all (${ws.tabs.length})`;
+      openAllBtn.textContent = `Open all (${(ws.tabs || []).length})`;
       openAllBtn.addEventListener('click', () => {
-        chrome.windows.create({ url: ws.tabs.map((t) => t.url) });
+        chrome.windows.create({ url: (ws.tabs || []).map((t) => t.url) });
       });
 
       wsHeader.textContent = `${label} `;
       wsHeader.append(openAllBtn);
       remoteList.append(wsHeader);
 
-      for (const tab of ws.tabs) {
+      for (const tab of ws.tabs || []) {
         const tabRow = document.createElement('div');
         tabRow.style.marginLeft = '16px';
         tabRow.style.cursor = 'pointer';
@@ -139,11 +145,6 @@ async function renderRemoteDevices() {
   if (devices.length === 0 && pending.length === 0) {
     remoteList.textContent = 'No other devices found in the sync folder yet.';
   }
-}
-
-async function getOwnDeviceId() {
-  const { device } = await chrome.storage.local.get('device');
-  return device?.id;
 }
 
 renderRemoteDevices();
@@ -167,7 +168,20 @@ async function renderFolderBanner() {
     const btn = document.createElement('button');
     btn.textContent = 'Reconnect';
     btn.addEventListener('click', async () => {
-      const newHandle = await pickSyncFolder();
+      // Re-granting permission on the already-saved handle is a single
+      // click; only fall back to a full new folder picker if that fails.
+      if (await verifyPermission(handle, true)) {
+        await renderFolderBanner();
+        await renderRemoteDevices();
+        return;
+      }
+      let newHandle;
+      try {
+        newHandle = await pickSyncFolder();
+      } catch (err) {
+        if (err?.name === 'AbortError') return; // user cancelled the picker
+        throw err;
+      }
       await saveHandle(newHandle);
       await renderFolderBanner();
       await renderRemoteDevices();

@@ -22,6 +22,17 @@
   <button id="pickFolder">Choose sync folder…</button>
   <div id="folderStatus">No folder chosen yet.</div>
 
+  <label>Layer 2: real workspace names (optional)</label>
+  <p>
+    The Custom UI Modification script that supplies real Vivaldi workspace
+    names is at <code>uimod/workspacesync-uimod.js</code> inside this
+    extension's folder on disk. To register it, go to Vivaldi Settings →
+    Appearance → Custom UI Modifications and point the JavaScript field at
+    that file's full path. This step is entirely optional — WorkspaceSync
+    works fully without it, just with typed-in labels instead of suggested
+    names.
+  </p>
+
   <script src="options.js" type="module"></script>
 </body>
 </html>

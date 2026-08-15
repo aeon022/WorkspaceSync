@@ -19,7 +19,8 @@
   "action": {
     "default_title": "WorkspaceSync"
   },
+  "_comment_externally_connectable": "UNVERIFIED origin guess for Vivaldi's own UI resource ID (Layer 2 bridge target). chrome:// is not a scheme Chromium's externally_connectable.matches parser accepts, so it was replaced with chrome-extension:// (a valid scheme) to avoid an install-time manifest parse error that would block the whole extension from loading. Confirm by loading in real Vivaldi and checking for a parse error; if the origin itself is wrong, the bridge just silently never fires (safe) instead of breaking Layer 1 — find the real origin via vivaldi://inspect/#apps or similar and correct the pattern below.",
   "externally_connectable": {
-    "matches": ["chrome://vivaldi-webui/*"]
+    "matches": ["chrome-extension://mpognobbkildjkofajifpdfhcoklimli/*"]
   }
 }

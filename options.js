@@ -31,7 +31,13 @@ deviceNameInput.addEventListener('change', async () => {
 });
 
 pickFolderBtn.addEventListener('click', async () => {
-  const handle = await pickSyncFolder();
+  let handle;
+  try {
+    handle = await pickSyncFolder();
+  } catch (err) {
+    if (err?.name === 'AbortError') return; // user cancelled the picker
+    throw err;
+  }
   await saveHandle(handle);
   const device = await getOrCreateDevice();
   await writeDeviceFile(handle, device.id, {

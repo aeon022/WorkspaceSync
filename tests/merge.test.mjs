@@ -1,7 +1,5 @@
-'use strict';
-
-const assert = require('node:assert');
-const { computeSyncActions } = require('../lib/merge.js');
+import assert from 'node:assert';
+import { computeSyncActions } from '../lib/merge.js';
 
 function run(name, fn) {
   try {
