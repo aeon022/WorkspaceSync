@@ -2,11 +2,29 @@
 
 import { getLocalWorkspaces } from './lib/workspace.js';
 import { getLabels, setLabel } from './lib/labels.js';
+import { isMirrored, setMirrored } from './lib/mirrorState.js';
 
 const localList = document.getElementById('localWorkspaces');
 
+async function collectRemoteLabels() {
+  const handle = await loadHandle();
+  if (!handle || !(await verifyPermission(handle, false))) return new Set();
+  const { devices } = await scanSyncFolder(handle, await getOwnDeviceId());
+  const labels = new Set();
+  for (const device of devices) {
+    for (const ws of device.workspaces || []) {
+      if (ws.label) labels.add(ws.label);
+    }
+  }
+  return labels;
+}
+
 async function renderLocalWorkspaces() {
-  const [workspaces, labels] = await Promise.all([getLocalWorkspaces(), getLabels()]);
+  const [workspaces, labels, remoteLabels] = await Promise.all([
+    getLocalWorkspaces(),
+    getLabels(),
+    collectRemoteLabels()
+  ]);
   localList.innerHTML = '';
 
   for (const ws of workspaces) {
@@ -16,7 +34,8 @@ async function renderLocalWorkspaces() {
     const input = document.createElement('input');
     input.type = 'text';
     input.placeholder = 'Name this workspace…';
-    input.value = labels[ws.workspaceId] || '';
+    const currentLabel = labels[ws.workspaceId] || '';
+    input.value = currentLabel;
 
     const count = document.createElement('span');
     count.className = 'count';
@@ -24,9 +43,23 @@ async function renderLocalWorkspaces() {
 
     input.addEventListener('change', async () => {
       await setLabel(ws.workspaceId, input.value.trim());
+      renderLocalWorkspaces();
     });
 
     row.append(input, count);
+
+    if (currentLabel && remoteLabels.has(currentLabel)) {
+      const mirrorLabel = document.createElement('label');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = await isMirrored(ws.workspaceId);
+      checkbox.addEventListener('change', async () => {
+        await setMirrored(ws.workspaceId, checkbox.checked);
+      });
+      mirrorLabel.append(checkbox, ' Mirror');
+      row.append(mirrorLabel);
+    }
+
     localList.append(row);
   }
 
