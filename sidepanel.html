@@ -6,11 +6,16 @@
   <style>
     body { font: 13px system-ui, sans-serif; margin: 0; padding: 12px; color: #1a1a1a; }
     h1 { font-size: 14px; margin: 0 0 12px; }
+    h2 { font-size: 12px; text-transform: uppercase; color: #666; margin: 16px 0 6px; }
+    .ws-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+    .ws-row input[type="text"] { flex: 1; padding: 4px; }
+    .ws-row .count { color: #888; font-size: 11px; }
   </style>
 </head>
 <body>
   <h1>WorkspaceSync</h1>
-  <div id="root">Loading…</div>
+  <h2>This device's workspaces</h2>
+  <div id="localWorkspaces">Loading…</div>
   <script src="sidepanel.js" type="module"></script>
 </body>
 </html>
