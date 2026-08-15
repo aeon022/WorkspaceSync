@@ -1402,10 +1402,10 @@ git commit -m "Add optional Layer 2 UI modification bridge for real workspace na
 
 - Problem statement / native-sync gap → addressed by the whole plan; not a separate task.
 - Layer 1 vs Layer 2 split → Tasks 1-9 (Layer 1, fully standalone) vs Task 10 (Layer 2, isolated, degrades cleanly).
-- Data model (`<deviceId>.json`, `recentEvents` cap 50) → Task 4 (`writeSnapshot`), Task 8 (`recordLocalEvent`'s `.slice(-50)`).
+- Data model (`<deviceId>.json`, `recentEvents` cap 50) → Task 4 (`writeSnapshot`), Task 8 Step 3 (open/close event diffing, `.slice(-50)`).
 - Workspace identity & labeling → Task 2 (`normalizeWorkspaceId`), Task 5 (label UI), Task 10 (name suggestions).
 - Browse & pick sidepanel → Task 7.
-- Live mirror (both-sides toggle, 1-minute alarm, event-log replay, URL dedup) → Task 8, dedup specifically covered by Task 6's tests and Task 8 Step 6's manual verification.
+- Live mirror (both-sides toggle, 1-minute alarm, event-log replay, URL dedup) → Task 8, dedup specifically covered by Task 6's tests and Task 8 Step 5's manual verification.
 - Setup UX (folder picker, device name, UI mod instructions) → Task 3 (folder/device name), Task 10 Step 5 (UI mod instructions).
 - Error handling (iCloud placeholders, lost permission, missing Layer 2) → Task 7 (`pending`), Task 9 (permission banner), Task 10 (degrades cleanly, tested explicitly).
 - Testing (assert-based merge test) → Task 6.
