@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "WorkspaceSync",
+  "version": "0.1.0",
+  "description": "Browse and mirror Vivaldi workspaces and open tabs across your devices.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAstTpFKIA9lR3xHxnCorQXOVzyfYTIpSo89TK145cIGJoYYrVMJgcP8LRTIXNxWMCGOyBnhHHOwQrP7g7HZdhKL0oIkTjW4TxJghbJf5yxoyAgKgS2IRmW/5gmd17U4pqDFc41fgNnoYybArwPhbkjOdzC940nSOrYc5vxc0swNeZKVhCcSf5g0CaaoL7TingWbRMn6lZX4BhHADldM/u8BplZM4gHD8BgAUgzVg+q/6rfIMhntb3M9sFX5xcjKE6V4qDctrrJkDwEPpF9+E8wMxON0BYdHaytfUxkoCT8FoIXw2Yi0zsKpxsnx/ASeWemv8eOJuFCmsoh5PbAWCJ7QIDAQAB",
+  "permissions": ["tabs", "storage", "alarms", "sidePanel"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "WorkspaceSync"
+  }
+}
