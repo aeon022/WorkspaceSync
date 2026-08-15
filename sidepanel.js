@@ -39,3 +39,78 @@ renderLocalWorkspaces();
 chrome.tabs.onCreated.addListener(renderLocalWorkspaces);
 chrome.tabs.onRemoved.addListener(renderLocalWorkspaces);
 chrome.tabs.onUpdated.addListener(renderLocalWorkspaces);
+
+import { loadHandle } from './lib/handleStore.js';
+import { verifyPermission, scanSyncFolder } from './lib/syncFolder.js';
+
+const remoteList = document.getElementById('remoteDevices');
+
+async function renderRemoteDevices() {
+  const handle = await loadHandle();
+  if (!handle) {
+    remoteList.textContent = 'No sync folder configured — set one up in Options.';
+    return;
+  }
+  if (!(await verifyPermission(handle, false))) {
+    remoteList.textContent = 'Sync folder permission lost — reconnect it in Options.';
+    return;
+  }
+
+  const { devices, pending } = await scanSyncFolder(handle, (await getOwnDeviceId()));
+  remoteList.innerHTML = '';
+
+  for (const name of pending) {
+    const p = document.createElement('div');
+    p.textContent = `${name}: syncing…`;
+    remoteList.append(p);
+  }
+
+  for (const device of devices) {
+    const deviceHeader = document.createElement('div');
+    deviceHeader.textContent = device.deviceName || device.deviceId;
+    deviceHeader.style.fontWeight = '600';
+    deviceHeader.style.marginTop = '8px';
+    remoteList.append(deviceHeader);
+
+    for (const ws of device.workspaces || []) {
+      const wsHeader = document.createElement('div');
+      wsHeader.style.marginLeft = '8px';
+      wsHeader.style.marginTop = '4px';
+
+      const label = ws.label || '(unlabeled)';
+      const openAllBtn = document.createElement('button');
+      openAllBtn.textContent = `Open all (${ws.tabs.length})`;
+      openAllBtn.addEventListener('click', () => {
+        chrome.windows.create({ url: ws.tabs.map((t) => t.url) });
+      });
+
+      wsHeader.textContent = `${label} `;
+      wsHeader.append(openAllBtn);
+      remoteList.append(wsHeader);
+
+      for (const tab of ws.tabs) {
+        const tabRow = document.createElement('div');
+        tabRow.style.marginLeft = '16px';
+        tabRow.style.cursor = 'pointer';
+        tabRow.style.color = '#0645ad';
+        tabRow.textContent = tab.title || tab.url;
+        tabRow.addEventListener('click', () => {
+          chrome.tabs.create({ url: tab.url });
+        });
+        remoteList.append(tabRow);
+      }
+    }
+  }
+
+  if (devices.length === 0 && pending.length === 0) {
+    remoteList.textContent = 'No other devices found in the sync folder yet.';
+  }
+}
+
+async function getOwnDeviceId() {
+  const { device } = await chrome.storage.local.get('device');
+  return device?.id;
+}
+
+renderRemoteDevices();
+setInterval(renderRemoteDevices, 15000);
