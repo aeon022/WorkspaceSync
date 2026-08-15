@@ -35,7 +35,8 @@ async function renderLocalWorkspaces() {
     input.type = 'text';
     input.placeholder = 'Name this workspace…';
     const currentLabel = labels[ws.workspaceId] || '';
-    input.value = currentLabel;
+    const { suggestedNames } = await chrome.storage.local.get('suggestedNames');
+    input.value = currentLabel || (suggestedNames || {})[ws.workspaceId] || '';
 
     const count = document.createElement('span');
     count.className = 'count';

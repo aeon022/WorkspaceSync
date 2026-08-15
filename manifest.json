@@ -18,5 +18,8 @@
   },
   "action": {
     "default_title": "WorkspaceSync"
+  },
+  "externally_connectable": {
+    "matches": ["chrome://vivaldi-webui/*"]
   }
 }

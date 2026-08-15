@@ -107,3 +107,14 @@ async function readOwnPreviousSnapshot(handle, deviceId) {
     return { workspaces: [] };
   }
 }
+
+chrome.runtime.onMessageExternal.addListener((message) => {
+  if (message?.type !== 'workspaceNames' || !Array.isArray(message.names)) return;
+  chrome.storage.local.get('suggestedNames').then(({ suggestedNames }) => {
+    const updated = { ...(suggestedNames || {}) };
+    for (const { workspaceId, name } of message.names) {
+      if (name) updated[workspaceId] = name;
+    }
+    chrome.storage.local.set({ suggestedNames: updated });
+  });
+});
