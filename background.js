@@ -7,6 +7,7 @@ import { loadHandle } from './lib/handleStore.js';
 import { verifyPermission, writeDeviceFile, scanSyncFolder } from './lib/syncFolder.js';
 import { isMirrored, getLastAppliedTs, setLastAppliedTs } from './lib/mirrorState.js';
 import { computeSyncActions } from './lib/merge.js';
+import { getExcludedWorkspaces } from './lib/syncFlags.js';
 
 const ALARM_NAME = 'workspacesync-sync';
 
@@ -34,15 +35,22 @@ export async function writeSnapshot() {
   if (!handle) return; // no sync folder configured yet
   if (!(await verifyPermission(handle, false))) return; // Task 9 handles surfacing this
 
-  const [device, localWorkspaces, labels] = await Promise.all([
+  const [device, localWorkspaces, labels, excludedWorkspaces] = await Promise.all([
     getOrCreateDevice(),
     getLocalWorkspaces(),
-    getLabels()
+    getLabels(),
+    getExcludedWorkspaces()
   ]);
 
   const { workspaces: previous } = await readOwnPreviousSnapshot(handle, device.id);
 
-  const workspaces = await Promise.all(localWorkspaces.map(async (ws) => {
+  // Excluded workspaces (e.g. "Banking") never leave this device: they're
+  // dropped before writing, not just hidden from other devices' view. If a
+  // workspace was synced before and then excluded, this also removes any
+  // previously-written data for it on the next tick.
+  const syncableWorkspaces = localWorkspaces.filter((ws) => !excludedWorkspaces[ws.workspaceId]);
+
+  const workspaces = await Promise.all(syncableWorkspaces.map(async (ws) => {
     const prev = previous.find((p) => p.localId === ws.workspaceId);
     const prevUrls = new Set((prev?.tabs || []).map((t) => t.url));
     const currentUrls = new Set(ws.tabs.map((t) => t.url));
@@ -78,9 +86,15 @@ export async function reconcileMirrors() {
   const device = await getOrCreateDevice();
   const localWorkspaces = await getLocalWorkspaces();
   const labels = await getLabels();
+  const excludedWorkspaces = await getExcludedWorkspaces();
   const { devices: remoteDevices } = await scanSyncFolder(handle, device.id);
 
   for (const ws of localWorkspaces) {
+    // Excluded workspaces don't sync in either direction: they never send
+    // their own tabs out (handled in writeSnapshot), and they never pull
+    // remote tabs in either — otherwise a "private" workspace could still
+    // be influenced by another device's data despite being excluded.
+    if (excludedWorkspaces[ws.workspaceId]) continue;
     const label = labels[ws.workspaceId];
     if (!label) continue;
     if (!(await isMirrored(ws.workspaceId))) continue;

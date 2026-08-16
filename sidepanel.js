@@ -3,6 +3,7 @@
 import { getLocalWorkspaces } from './lib/workspace.js';
 import { getLabels, setLabel } from './lib/labels.js';
 import { isMirrored, setMirrored } from './lib/mirrorState.js';
+import { getExcludedWorkspaces, setSyncExcluded } from './lib/syncFlags.js';
 import { getOrCreateDevice } from './lib/device.js';
 import { loadHandle, saveHandle } from './lib/handleStore.js';
 import { verifyPermission, scanSyncFolder, pickSyncFolder } from './lib/syncFolder.js';
@@ -23,11 +24,12 @@ async function collectRemoteLabels() {
 }
 
 async function renderLocalWorkspaces() {
-  const [workspaces, labels, remoteLabels, suggestedNamesResult] = await Promise.all([
+  const [workspaces, labels, remoteLabels, suggestedNamesResult, excludedWorkspaces] = await Promise.all([
     getLocalWorkspaces(),
     getLabels(),
     collectRemoteLabels(),
-    chrome.storage.local.get('suggestedNames')
+    chrome.storage.local.get('suggestedNames'),
+    getExcludedWorkspaces()
   ]);
   const suggestedNames = suggestedNamesResult.suggestedNames || {};
   localList.innerHTML = '';
@@ -53,7 +55,25 @@ async function renderLocalWorkspaces() {
 
     row.append(input, count);
 
-    if (currentLabel && remoteLabels.has(currentLabel)) {
+    const isExcluded = !!excludedWorkspaces[ws.workspaceId];
+
+    const syncLabel = document.createElement('label');
+    const syncCheckbox = document.createElement('input');
+    syncCheckbox.type = 'checkbox';
+    syncCheckbox.checked = !isExcluded;
+    syncCheckbox.addEventListener('change', async () => {
+      await setSyncExcluded(ws.workspaceId, !syncCheckbox.checked);
+      renderLocalWorkspaces();
+    });
+    syncLabel.append(syncCheckbox, ' Sync');
+    row.append(syncLabel);
+
+    if (isExcluded) {
+      const notSyncedNote = document.createElement('span');
+      notSyncedNote.className = 'count';
+      notSyncedNote.textContent = '(not synced)';
+      row.append(notSyncedNote);
+    } else if (currentLabel && remoteLabels.has(currentLabel)) {
       const mirrorLabel = document.createElement('label');
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
