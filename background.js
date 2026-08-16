@@ -9,6 +9,7 @@ import { isMirrored, getLastAppliedTs, setLastAppliedTs } from './lib/mirrorStat
 import { computeSyncActions } from './lib/merge.js';
 import { getExcludedWorkspaces } from './lib/syncFlags.js';
 import { getColors } from './lib/workspaceColors.js';
+import { writeInboxEntry, readInboxEntry, getLastInboxTs, setLastInboxTs } from './lib/inbox.js';
 
 const ALARM_NAME = 'workspacesync-sync';
 
@@ -27,9 +28,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) return;
   await writeSnapshot();
   await reconcileMirrors();
+  await checkOwnInbox();
+  await rebuildSendToDeviceMenu();
 });
-chrome.runtime.onInstalled.addListener(writeSnapshot);
-chrome.runtime.onStartup.addListener(writeSnapshot);
+chrome.runtime.onInstalled.addListener(async () => {
+  await writeSnapshot();
+  await rebuildSendToDeviceMenu();
+});
+chrome.runtime.onStartup.addListener(async () => {
+  await writeSnapshot();
+  await rebuildSendToDeviceMenu();
+});
 
 export async function writeSnapshot() {
   const handle = await loadHandle();
@@ -162,6 +171,72 @@ export async function reconcileMirrors() {
       await setLastAppliedTs(remoteDevice.deviceId, label, newLastAppliedTs);
     }
   }
+}
+
+const SEND_MENU_PARENT_ID = 'workspacesync-send-parent';
+const SEND_MENU_PREFIX = 'workspacesync-send-to-';
+
+async function rebuildSendToDeviceMenu() {
+  const handle = await loadHandle();
+  await new Promise((resolve) => chrome.contextMenus.removeAll(resolve));
+  if (!handle || !(await verifyPermission(handle, false))) return;
+
+  const device = await getOrCreateDevice();
+  const { devices: remoteDevices } = await scanSyncFolder(handle, device.id);
+  if (remoteDevices.length === 0) return;
+
+  chrome.contextMenus.create({
+    id: SEND_MENU_PARENT_ID,
+    title: 'Send tab to device',
+    contexts: ['page']
+  });
+  for (const remote of remoteDevices) {
+    chrome.contextMenus.create({
+      id: `${SEND_MENU_PREFIX}${remote.deviceId}`,
+      parentId: SEND_MENU_PARENT_ID,
+      title: remote.deviceName || remote.deviceId,
+      contexts: ['page']
+    });
+  }
+}
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!info.menuItemId.startsWith(SEND_MENU_PREFIX) || !tab?.url) return;
+  const targetDeviceId = info.menuItemId.slice(SEND_MENU_PREFIX.length);
+
+  const handle = await loadHandle();
+  if (!handle || !(await verifyPermission(handle, false))) return;
+
+  const device = await getOrCreateDevice();
+  await writeInboxEntry(handle, targetDeviceId, {
+    url: tab.url,
+    title: tab.title || tab.url,
+    from: device.name,
+    ts: Date.now()
+  });
+});
+
+// Single-slot inbox check: opens a tab another device sent here, once per
+// send. Uses a locally-stored cursor timestamp rather than deleting the
+// inbox file after reading, since deleting would race against another
+// device writing a new send into the same file around the same tick.
+async function checkOwnInbox() {
+  const handle = await loadHandle();
+  if (!handle || !(await verifyPermission(handle, false))) return;
+
+  const device = await getOrCreateDevice();
+  const entry = await readInboxEntry(handle, device.id);
+  if (!entry?.url || !entry?.ts) return;
+
+  const lastTs = await getLastInboxTs();
+  if (entry.ts <= lastTs) return;
+
+  try {
+    await chrome.tabs.create({ url: entry.url });
+  } catch (err) {
+    console.warn('[WorkspaceSync] failed to open tab sent from another device', entry.url, err);
+  }
+  await setLastInboxTs(entry.ts);
 }
 
 async function readOwnPreviousSnapshot(handle, deviceId) {
