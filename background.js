@@ -8,6 +8,7 @@ import { verifyPermission, writeDeviceFile, scanSyncFolder } from './lib/syncFol
 import { isMirrored, getLastAppliedTs, setLastAppliedTs } from './lib/mirrorState.js';
 import { computeSyncActions } from './lib/merge.js';
 import { getExcludedWorkspaces } from './lib/syncFlags.js';
+import { getColors } from './lib/workspaceColors.js';
 
 const ALARM_NAME = 'workspacesync-sync';
 
@@ -35,11 +36,12 @@ export async function writeSnapshot() {
   if (!handle) return; // no sync folder configured yet
   if (!(await verifyPermission(handle, false))) return; // Task 9 handles surfacing this
 
-  const [device, localWorkspaces, labels, excludedWorkspaces] = await Promise.all([
+  const [device, localWorkspaces, labels, excludedWorkspaces, colors] = await Promise.all([
     getOrCreateDevice(),
     getLocalWorkspaces(),
     getLabels(),
-    getExcludedWorkspaces()
+    getExcludedWorkspaces(),
+    getColors()
   ]);
 
   const { workspaces: previous } = await readOwnPreviousSnapshot(handle, device.id);
@@ -63,6 +65,7 @@ export async function writeSnapshot() {
     return {
       localId: ws.workspaceId,
       label: labels[ws.workspaceId] || prev?.label || '',
+      color: colors[ws.workspaceId] || prev?.color || '',
       mirror: await isMirrored(ws.workspaceId),
       tabs: ws.tabs,
       recentEvents: [...(prev?.recentEvents || []), ...newEvents].slice(-50)

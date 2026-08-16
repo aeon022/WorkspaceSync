@@ -4,6 +4,7 @@ import { getLocalWorkspaces } from './lib/workspace.js';
 import { getLabels, setLabel } from './lib/labels.js';
 import { isMirrored, setMirrored } from './lib/mirrorState.js';
 import { getExcludedWorkspaces, setSyncExcluded } from './lib/syncFlags.js';
+import { getColors, setColor } from './lib/workspaceColors.js';
 import { getOrCreateDevice } from './lib/device.js';
 import { loadHandle, saveHandle } from './lib/handleStore.js';
 import { verifyPermission, scanSyncFolder, pickSyncFolder } from './lib/syncFolder.js';
@@ -36,12 +37,13 @@ async function collectRemoteLabels() {
 }
 
 async function renderLocalWorkspaces() {
-  const [workspaces, labels, remoteLabels, suggestedNamesResult, excludedWorkspaces] = await Promise.all([
+  const [workspaces, labels, remoteLabels, suggestedNamesResult, excludedWorkspaces, colors] = await Promise.all([
     getLocalWorkspaces(),
     getLabels(),
     collectRemoteLabels(),
     chrome.storage.local.get('suggestedNames'),
-    getExcludedWorkspaces()
+    getExcludedWorkspaces(),
+    getColors()
   ]);
   const suggestedNames = suggestedNamesResult.suggestedNames || {};
   localList.innerHTML = '';
@@ -49,6 +51,20 @@ async function renderLocalWorkspaces() {
   for (const ws of workspaces) {
     const row = document.createElement('div');
     row.className = 'ws-row';
+
+    const colorPicker = document.createElement('input');
+    colorPicker.type = 'color';
+    colorPicker.style.width = '20px';
+    colorPicker.style.height = '20px';
+    colorPicker.style.padding = '0';
+    colorPicker.style.border = 'none';
+    const currentColor = colors[ws.workspaceId] || '';
+    colorPicker.value = currentColor || '#cccccc';
+    colorPicker.title = currentColor ? 'Workspace color' : 'Set a workspace color';
+    colorPicker.addEventListener('change', async () => {
+      await setColor(ws.workspaceId, colorPicker.value);
+      renderLocalWorkspaces();
+    });
 
     const input = document.createElement('input');
     input.type = 'text';
@@ -65,7 +81,7 @@ async function renderLocalWorkspaces() {
       renderLocalWorkspaces();
     });
 
-    row.append(input, count);
+    row.append(colorPicker, input, count);
 
     const isExcluded = !!excludedWorkspaces[ws.workspaceId];
 
@@ -163,8 +179,17 @@ async function renderRemoteDevices() {
         chrome.windows.create({ url: (ws.tabs || []).map((t) => t.url) });
       });
 
-      wsHeader.textContent = `${label} `;
-      wsHeader.append(openAllBtn);
+      if (ws.color) {
+        const dot = document.createElement('span');
+        dot.style.display = 'inline-block';
+        dot.style.width = '8px';
+        dot.style.height = '8px';
+        dot.style.borderRadius = '50%';
+        dot.style.marginRight = '4px';
+        dot.style.background = ws.color;
+        wsHeader.append(dot);
+      }
+      wsHeader.append(`${label} `, openAllBtn);
       remoteList.append(wsHeader);
 
       for (const tab of ws.tabs || []) {
