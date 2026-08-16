@@ -6,8 +6,8 @@ import { isMirrored, setMirrored } from './lib/mirrorState.js';
 import { getExcludedWorkspaces, setSyncExcluded } from './lib/syncFlags.js';
 import { getColors, setColor } from './lib/workspaceColors.js';
 import { getOrCreateDevice } from './lib/device.js';
-import { loadHandle, saveHandle } from './lib/handleStore.js';
-import { verifyPermission, scanSyncFolder, pickSyncFolder } from './lib/syncFolder.js';
+import { loadHandle } from './lib/handleStore.js';
+import { verifyPermission, scanSyncFolder } from './lib/syncFolder.js';
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
@@ -241,28 +241,15 @@ async function renderFolderBanner() {
   }
 
   if (!(await verifyPermission(handle, false))) {
+    // The side panel can't reliably show native permission/picker dialogs
+    // (confirmed by testing - clicking a requestPermission()/
+    // showDirectoryPicker() trigger here does nothing visible, while the
+    // identical call from the Options tab works). Route to Options instead
+    // of attempting it here.
     folderBanner.textContent = 'Sync folder permission was lost. ';
     const btn = document.createElement('button');
-    btn.textContent = 'Reconnect';
-    btn.addEventListener('click', async () => {
-      // Re-granting permission on the already-saved handle is a single
-      // click; only fall back to a full new folder picker if that fails.
-      if (await verifyPermission(handle, true)) {
-        await renderFolderBanner();
-        await renderRemoteDevices();
-        return;
-      }
-      let newHandle;
-      try {
-        newHandle = await pickSyncFolder();
-      } catch (err) {
-        if (err?.name === 'AbortError') return; // user cancelled the picker
-        throw err;
-      }
-      await saveHandle(newHandle);
-      await renderFolderBanner();
-      await renderRemoteDevices();
-    });
+    btn.textContent = 'Reconnect in Options';
+    btn.addEventListener('click', () => chrome.runtime.openOptionsPage());
     folderBanner.append(btn);
     folderBanner.style.display = 'block';
   }
