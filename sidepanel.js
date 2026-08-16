@@ -21,6 +21,10 @@ function formatRelativeSync(isoString) {
   return relativeTimeFormatter.format(Math.round(diffHour / 24), 'day');
 }
 
+document.getElementById('optionsBtn').addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+});
+
 const localList = document.getElementById('localWorkspaces');
 
 async function collectRemoteLabels() {

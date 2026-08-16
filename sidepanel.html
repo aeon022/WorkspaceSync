@@ -5,7 +5,9 @@
   <title>WorkspaceSync</title>
   <style>
     body { font: 13px system-ui, sans-serif; margin: 0; padding: 12px; color: #1a1a1a; }
-    h1 { font-size: 14px; margin: 0 0 12px; }
+    .header-row { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+    h1 { font-size: 14px; margin: 0; }
+    #optionsBtn { font-size: 11px; padding: 4px 8px; cursor: pointer; }
     h2 { font-size: 12px; text-transform: uppercase; color: #666; margin: 16px 0 6px; }
     .ws-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
     .ws-row input[type="text"] { flex: 1; padding: 4px; }
@@ -13,7 +15,10 @@
   </style>
 </head>
 <body>
-  <h1>WorkspaceSync</h1>
+  <div class="header-row">
+    <h1>WorkspaceSync</h1>
+    <button id="optionsBtn" title="Options">⚙️ Options</button>
+  </div>
   <div id="folderBanner" style="display:none; background:#fff3cd; border:1px solid #ffe69c; padding:8px; border-radius:4px; margin-bottom:12px;"></div>
   <h2>This device's workspaces</h2>
   <div id="localWorkspaces">Loading…</div>
