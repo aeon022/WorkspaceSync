@@ -79,9 +79,11 @@ async function renderLocalWorkspaces() {
       renderLocalWorkspaces();
     });
 
+    const isDefault = ws.workspaceId === 'default';
+
     const input = document.createElement('input');
     input.type = 'text';
-    input.placeholder = 'Name this workspace…';
+    input.placeholder = isDefault ? 'Not in a Vivaldi workspace…' : 'Name this workspace…';
     const currentLabel = labels[ws.workspaceId] || '';
     input.value = currentLabel || suggestedNames[ws.workspaceId] || '';
 
@@ -127,6 +129,15 @@ async function renderLocalWorkspaces() {
     }
 
     localList.append(row);
+
+    if (isDefault) {
+      const hint = document.createElement('div');
+      hint.className = 'muted';
+      hint.style.fontSize = '10px';
+      hint.style.margin = '0 0 8px';
+      hint.textContent = 'Tabs Vivaldi doesn\'t assign to any workspace (extension panels, internal pages, etc.)';
+      localList.append(hint);
+    }
   }
 
   if (workspaces.length === 0) {
