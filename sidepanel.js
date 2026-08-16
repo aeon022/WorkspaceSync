@@ -1,6 +1,6 @@
 'use strict';
 
-import { getLocalWorkspaces } from './lib/workspace.js';
+import { getLocalWorkspaces, isLayer2Active } from './lib/workspace.js';
 import { getLabels, setLabel } from './lib/labels.js';
 import { isMirrored, setMirrored } from './lib/mirrorState.js';
 import { getExcludedWorkspaces, setSyncExcluded } from './lib/syncFlags.js';
@@ -41,16 +41,26 @@ async function collectRemoteLabels() {
 }
 
 async function renderLocalWorkspaces() {
-  const [workspaces, labels, remoteLabels, suggestedNamesResult, excludedWorkspaces, colors] = await Promise.all([
+  const [workspaces, labels, remoteLabels, layer2Result, excludedWorkspaces, colors, layer2Active] = await Promise.all([
     getLocalWorkspaces(),
     getLabels(),
     collectRemoteLabels(),
-    chrome.storage.local.get('suggestedNames'),
+    chrome.storage.local.get('layer2WorkspaceNames'),
     getExcludedWorkspaces(),
-    getColors()
+    getColors(),
+    isLayer2Active()
   ]);
-  const suggestedNames = suggestedNamesResult.suggestedNames || {};
+  const suggestedNames = layer2Result.layer2WorkspaceNames || {};
   localList.innerHTML = '';
+
+  if (!layer2Active) {
+    const note = document.createElement('p');
+    note.className = 'muted';
+    note.style.fontSize = '11px';
+    note.style.margin = '0 0 8px';
+    note.textContent = 'Workspace detection needs the Custom UI Modification registered — see Options for setup. Until then, every tab shows up as one workspace.';
+    localList.append(note);
+  }
 
   for (const ws of workspaces) {
     const row = document.createElement('div');

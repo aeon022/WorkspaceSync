@@ -25,15 +25,16 @@
   <button id="reconnectFolder" style="display:none;">Reconnect</button>
   <div id="folderStatus">No folder chosen yet.</div>
 
-  <label>Layer 2: real workspace names (optional)</label>
+  <label>Required: workspace detection</label>
   <p>
-    The Custom UI Modification script that supplies real Vivaldi workspace
-    names is at <code>uimod/workspacesync-uimod.js</code> inside this
+    Vivaldi only exposes which workspace a tab belongs to from its own
+    privileged UI context — never to a regular extension. Without this
+    step, every tab shows up as a single undifferentiated workspace.
+    The script is at <code>uimod/workspacesync-uimod.js</code> inside this
     extension's folder on disk. To register it, go to Vivaldi Settings →
     Appearance → Custom UI Modifications and point the JavaScript field at
-    that file's full path. This step is entirely optional — WorkspaceSync
-    works fully without it, just with typed-in labels instead of suggested
-    names.
+    that file's full path, then restart Vivaldi. It also supplies your
+    real Vivaldi workspace names as label suggestions.
   </p>
 
   <label>Support</label>

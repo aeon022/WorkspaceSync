@@ -1,7 +1,7 @@
 'use strict';
 
 import { getOrCreateDevice } from './lib/device.js';
-import { getLocalWorkspaces, normalizeWorkspaceId, parseVivExtData } from './lib/workspace.js';
+import { getLocalWorkspaces } from './lib/workspace.js';
 import { getLabels } from './lib/labels.js';
 import { loadHandle } from './lib/handleStore.js';
 import { verifyPermission, writeDeviceFile, scanSyncFolder } from './lib/syncFolder.js';
@@ -148,15 +148,16 @@ export async function reconcileMirrors() {
 
       if (httpToClose.length) {
         // chrome.tabs.query({ url }) treats its argument as a match pattern
-        // (not a literal URL) and searches every window/workspace, so it can
-        // pick the wrong tab. Query once and match the exact URL within this
-        // specific local workspace instead.
-        const allTabs = await chrome.tabs.query({});
+        // (not a literal URL) and searches every window/workspace, and this
+        // extension's own tab objects never carry vivExtData/workspaceId
+        // anyway (see lib/workspace.js) - so matching happens against the
+        // Layer 2 cache instead, which already has both the real tab id and
+        // a resolved workspaceId per tab.
+        const { layer2Tabs } = await chrome.storage.local.get('layer2Tabs');
+        const candidates = layer2Tabs || [];
         for (const url of httpToClose) {
-          const match = allTabs.find(
-            (t) => t.url === url && normalizeWorkspaceId(parseVivExtData(t).workspaceId) === ws.workspaceId
-          );
-          if (!match) continue; // already gone, or was in a different workspace
+          const match = candidates.find((t) => t.url === url && t.workspaceId === ws.workspaceId);
+          if (!match) continue; // already gone, in a different workspace, or Layer 2 not active
           try {
             await chrome.tabs.remove(match.id);
           } catch (err) {
@@ -250,13 +251,15 @@ async function readOwnPreviousSnapshot(handle, deviceId) {
   }
 }
 
+// Layer 2 (uimod/workspacesync-uimod.js, running in Vivaldi's own privileged
+// UI context) is the only source of tab-to-workspace mapping this extension
+// has - see lib/workspace.js. This just caches whatever it last relayed;
+// getLocalWorkspaces() reads it back out.
 chrome.runtime.onMessageExternal.addListener((message) => {
-  if (message?.type !== 'workspaceNames' || !Array.isArray(message.names)) return;
-  chrome.storage.local.get('suggestedNames').then(({ suggestedNames }) => {
-    const updated = { ...(suggestedNames || {}) };
-    for (const { workspaceId, name } of message.names) {
-      if (name) updated[workspaceId] = name;
-    }
-    chrome.storage.local.set({ suggestedNames: updated });
+  if (message?.type !== 'tabSnapshot' || !Array.isArray(message.tabs)) return;
+  chrome.storage.local.set({
+    layer2Tabs: message.tabs,
+    layer2WorkspaceNames: message.workspaceNames || {},
+    layer2UpdatedAt: Date.now()
   });
 });
