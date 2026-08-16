@@ -28,14 +28,25 @@
   <label>Required: workspace detection</label>
   <p>
     Vivaldi only exposes which workspace a tab belongs to from its own
-    privileged UI context — never to a regular extension. Without this
-    step, every tab shows up as a single undifferentiated workspace.
-    The script is at <code>uimod/workspacesync-uimod.js</code> inside this
-    extension's folder on disk. To register it, go to Vivaldi Settings →
-    Appearance → Custom UI Modifications and point the JavaScript field at
-    that file's full path, then restart Vivaldi. It also supplies your
-    real Vivaldi workspace names as label suggestions.
+    privileged UI context — never to a regular extension, and messaging
+    between that context and this extension doesn't work either (confirmed
+    by testing — Vivaldi's own UI is a privileged internal component,
+    not a normal extension). So a small script writes the tab-to-workspace
+    mapping directly into your sync folder instead, which this extension
+    already has access to. Two one-time steps:
   </p>
+  <ol>
+    <li>Run <code>scripts/inject-uimod.sh</code> (from this extension's
+    folder on disk) to patch it into Vivaldi's own UI — Vivaldi's official
+    "Custom UI Modifications" setting only supports CSS, not JS, so there's
+    no menu for this. Re-run it any time after a Vivaldi update resets it
+    (a LaunchAgent can do this automatically — see the script's comments).</li>
+    <li>After restarting Vivaldi, click the small "🔗 WorkspaceSync" button
+    that appears in the bottom-right corner of every Vivaldi window, and
+    pick the same sync folder configured above. This is a one-time
+    permission grant (per browser profile) for that script — it also
+    supplies your real Vivaldi workspace names as label suggestions.</li>
+  </ol>
 
   <label>Support</label>
   <p>

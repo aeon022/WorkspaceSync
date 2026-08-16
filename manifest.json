@@ -18,9 +18,5 @@
   },
   "action": {
     "default_title": "WorkspaceSync"
-  },
-  "_comment_externally_connectable": "mpognobbkildjkofajifpdfhcoklimli is Vivaldi's own internal UI extension (confirmed via vivaldi://inspect/#apps and live testing). 'matches' is for web pages (http/https URL patterns) - an extension sender must be allowed via 'ids' instead, or Chromium reports 'Could not establish connection. Receiving end does not exist.' even though the target listener exists (confirmed by live testing this exact failure).",
-  "externally_connectable": {
-    "ids": ["mpognobbkildjkofajifpdfhcoklimli"]
   }
 }
