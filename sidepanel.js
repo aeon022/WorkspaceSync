@@ -8,6 +8,18 @@ import { getOrCreateDevice } from './lib/device.js';
 import { loadHandle, saveHandle } from './lib/handleStore.js';
 import { verifyPermission, scanSyncFolder, pickSyncFolder } from './lib/syncFolder.js';
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+
+function formatRelativeSync(isoString) {
+  if (!isoString) return '';
+  const diffMin = Math.round((new Date(isoString).getTime() - Date.now()) / 60000);
+  if (Math.abs(diffMin) < 1) return 'just now';
+  if (Math.abs(diffMin) < 60) return relativeTimeFormatter.format(diffMin, 'minute');
+  const diffHour = Math.round(diffMin / 60);
+  if (Math.abs(diffHour) < 24) return relativeTimeFormatter.format(diffHour, 'hour');
+  return relativeTimeFormatter.format(Math.round(diffHour / 24), 'day');
+}
+
 const localList = document.getElementById('localWorkspaces');
 
 async function collectRemoteLabels() {
@@ -127,9 +139,16 @@ async function renderRemoteDevices() {
 
   for (const device of devices) {
     const deviceHeader = document.createElement('div');
-    deviceHeader.textContent = device.deviceName || device.deviceId;
     deviceHeader.style.fontWeight = '600';
     deviceHeader.style.marginTop = '8px';
+    const deviceNameSpan = document.createElement('span');
+    deviceNameSpan.textContent = device.deviceName || device.deviceId;
+    const syncedSpan = document.createElement('span');
+    syncedSpan.style.fontWeight = 'normal';
+    syncedSpan.style.color = '#888';
+    syncedSpan.style.fontSize = '11px';
+    syncedSpan.textContent = device.updatedAt ? ` · ${formatRelativeSync(device.updatedAt)}` : '';
+    deviceHeader.append(deviceNameSpan, syncedSpan);
     remoteList.append(deviceHeader);
 
     for (const ws of device.workspaces || []) {
