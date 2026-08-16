@@ -164,8 +164,8 @@ async function renderRemoteDevices() {
     const deviceNameSpan = document.createElement('span');
     deviceNameSpan.textContent = device.deviceName || device.deviceId;
     const syncedSpan = document.createElement('span');
+    syncedSpan.className = 'muted';
     syncedSpan.style.fontWeight = 'normal';
-    syncedSpan.style.color = '#888';
     syncedSpan.style.fontSize = '11px';
     syncedSpan.textContent = device.updatedAt ? ` · ${formatRelativeSync(device.updatedAt)}` : '';
     deviceHeader.append(deviceNameSpan, syncedSpan);
@@ -190,6 +190,7 @@ async function renderRemoteDevices() {
         dot.style.height = '8px';
         dot.style.borderRadius = '50%';
         dot.style.marginRight = '4px';
+        dot.style.border = '1px solid var(--border)';
         dot.style.background = ws.color;
         wsHeader.append(dot);
       }
@@ -198,9 +199,8 @@ async function renderRemoteDevices() {
 
       for (const tab of ws.tabs || []) {
         const tabRow = document.createElement('div');
+        tabRow.className = 'tab-link';
         tabRow.style.marginLeft = '16px';
-        tabRow.style.cursor = 'pointer';
-        tabRow.style.color = '#0645ad';
         tabRow.textContent = tab.title || tab.url;
         tabRow.addEventListener('click', () => {
           chrome.tabs.create({ url: tab.url });

@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8">
   <title>WorkspaceSync Settings</title>
+  <link rel="stylesheet" href="theme.css">
   <style>
     body { font: 14px system-ui, sans-serif; margin: 24px; max-width: 560px; }
     h1 { font-size: 18px; }
     label { display: block; margin: 16px 0 4px; font-weight: 600; }
-    input[type="text"] { width: 100%; padding: 6px; box-sizing: border-box; }
+    input[type="text"] { width: 100%; padding: 6px; box-sizing: border-box; background: var(--input-bg); color: var(--fg); border: 1px solid var(--input-border); }
     button { margin-top: 8px; padding: 6px 12px; }
-    #folderStatus { margin-top: 8px; color: #555; }
+    code { background: var(--banner-bg); border: 1px solid var(--banner-border); padding: 1px 4px; border-radius: 3px; }
+    #folderStatus { margin-top: 8px; color: var(--muted); }
   </style>
 </head>
 <body>

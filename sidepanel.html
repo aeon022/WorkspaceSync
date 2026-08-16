@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <title>WorkspaceSync</title>
+  <link rel="stylesheet" href="theme.css">
   <style>
-    body { font: 13px system-ui, sans-serif; margin: 0; padding: 12px; color: #1a1a1a; }
+    body { font: 13px system-ui, sans-serif; margin: 0; padding: 12px; }
     .header-row { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
     h1 { font-size: 14px; margin: 0; }
     #optionsBtn { font-size: 11px; padding: 4px 8px; cursor: pointer; }
-    h2 { font-size: 12px; text-transform: uppercase; color: #666; margin: 16px 0 6px; }
+    h2 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px; }
     .ws-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
-    .ws-row input[type="text"] { flex: 1; padding: 4px; }
-    .ws-row .count { color: #888; font-size: 11px; }
+    .ws-row input[type="text"] { flex: 1; padding: 4px; background: var(--input-bg); color: var(--fg); border: 1px solid var(--input-border); }
+    .ws-row .count { color: var(--muted-2); font-size: 11px; }
   </style>
 </head>
 <body>
@@ -19,14 +20,14 @@
     <h1>WorkspaceSync</h1>
     <button id="optionsBtn" title="Options">⚙️ Options</button>
   </div>
-  <div id="folderBanner" style="display:none; background:#fff3cd; border:1px solid #ffe69c; padding:8px; border-radius:4px; margin-bottom:12px;"></div>
+  <div id="folderBanner" class="banner"></div>
   <h2>This device's workspaces</h2>
   <div id="localWorkspaces">Loading…</div>
   <h2>Other devices</h2>
   <div id="remoteDevices">Loading…</div>
   <h2>Support</h2>
-  <p style="color:#666; font-size:11px; margin:4px 0 8px;">WorkspaceSync is free. If it's useful, a coffee is always appreciated.</p>
-  <a href="https://buy.polar.sh/polar_cl_DrOMaecRuEdvn8seYYegzMt0jEDbuY92X4zMd2NkGD8" target="_blank" style="display:inline-block; padding:6px 12px; background:#fdf0d5; border:1px solid #e8c896; border-radius:4px; color:#5a3d1a; text-decoration:none; font-size:12px;">☕ Support Developer</a>
+  <p class="muted" style="font-size:11px; margin:4px 0 8px;">WorkspaceSync is free. If it's useful, a coffee is always appreciated.</p>
+  <a class="btn-support" href="https://buy.polar.sh/polar_cl_DrOMaecRuEdvn8seYYegzMt0jEDbuY92X4zMd2NkGD8" target="_blank">☕ Support Developer</a>
   <script src="sidepanel.js" type="module"></script>
 </body>
 </html>
