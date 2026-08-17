@@ -1,7 +1,7 @@
 'use strict';
 
 import { getOrCreateDevice } from './lib/device.js';
-import { getLocalWorkspaces, getLayer2Tabs } from './lib/workspace.js';
+import { getLocalWorkspaces, getLayer2Tabs, getLayer2WorkspaceNames } from './lib/workspace.js';
 import { getLabels } from './lib/labels.js';
 import { loadHandle } from './lib/handleStore.js';
 import { verifyPermission, writeDeviceFile, scanSyncFolder } from './lib/syncFolder.js';
@@ -45,12 +45,13 @@ export async function writeSnapshot() {
   if (!handle) return; // no sync folder configured yet
   if (!(await verifyPermission(handle, false))) return; // Task 9 handles surfacing this
 
-  const [device, localWorkspaces, labels, excludedWorkspaces, colors] = await Promise.all([
+  const [device, localWorkspaces, labels, excludedWorkspaces, colors, layer2Names] = await Promise.all([
     getOrCreateDevice(),
     getLocalWorkspaces(),
     getLabels(),
     getExcludedWorkspaces(),
-    getColors()
+    getColors(),
+    getLayer2WorkspaceNames()
   ]);
 
   const { workspaces: previous } = await readOwnPreviousSnapshot(handle, device.id);
@@ -73,7 +74,12 @@ export async function writeSnapshot() {
 
     return {
       localId: ws.workspaceId,
-      label: labels[ws.workspaceId] || prev?.label || '',
+      // Layer 2's real Vivaldi workspace name wins when available — that's
+      // the whole point of it (see uimod/workspacesync-uimod.js) — falling
+      // back to whatever the user typed by hand, then whatever was already
+      // written last time, so a workspace never regresses to blank once
+      // it's had a name from either source.
+      label: layer2Names[ws.workspaceId] || labels[ws.workspaceId] || prev?.label || '',
       color: colors[ws.workspaceId] || prev?.color || '',
       mirror: await isMirrored(ws.workspaceId),
       tabs: ws.tabs,
