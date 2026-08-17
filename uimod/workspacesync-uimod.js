@@ -88,10 +88,27 @@
   btn.style.padding = '6px 10px';
   btn.style.fontSize = '11px';
   btn.style.cursor = 'pointer';
+  btn.style.transition = 'opacity 0.6s ease';
   document.body.appendChild(btn);
 
-  function setStatus(text) {
+  // Success (✅) is transient: pop up to confirm, then fade out — this
+  // button lives fixed in Vivaldi's own browser chrome, not a page or the
+  // extension panel, so leaving it up forever after every 30s sync pulse
+  // would mean a permanent "UU" (the synced folder's name) stuck in the
+  // corner. Error/reconnect states (🔴/🟡) stay visible and clickable
+  // since those need the user to act.
+  let hideTimer = null;
+  function setStatus(text, autoHide) {
     btn.textContent = text;
+    clearTimeout(hideTimer);
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+    if (autoHide) {
+      hideTimer = setTimeout(() => {
+        btn.style.opacity = '0';
+        btn.style.pointerEvents = 'none';
+      }, 2000);
+    }
   }
 
   async function pickFolder() {
@@ -99,7 +116,7 @@
       const handle = await window.showDirectoryPicker({ id: 'workspacesync-layer2', mode: 'readwrite' });
       await saveHandle(handle);
       folderHandle = handle;
-      setStatus(`✅ WorkspaceSync: ${handle.name}`);
+      setStatus(`✅ WorkspaceSync: ${handle.name}`, true);
       await writeSnapshot();
     } catch (err) {
       console.warn('[WorkspaceSync UI mod] folder pick failed', err);
@@ -139,7 +156,7 @@
       await writable.write(JSON.stringify({ updatedAt: Date.now(), tabs: mappedTabs, workspaceNames }, null, 2));
       await writable.close();
 
-      setStatus(`✅ WorkspaceSync: ${folderHandle.name}`);
+      setStatus(`✅ WorkspaceSync: ${folderHandle.name}`, true);
     } catch (err) {
       console.warn('[WorkspaceSync UI mod] failed to write snapshot', err);
     }
@@ -153,7 +170,7 @@
     }
     folderHandle = handle;
     if (await verifyPermission(handle, false)) {
-      setStatus(`✅ WorkspaceSync: ${handle.name}`);
+      setStatus(`✅ WorkspaceSync: ${handle.name}`, true);
       await writeSnapshot();
     } else {
       setStatus('🟡 WorkspaceSync: click to reconnect');
