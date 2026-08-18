@@ -62,15 +62,15 @@ async function renderLocalWorkspaces() {
   }
 
   for (const ws of workspaces) {
-    const row = document.createElement('div');
-    row.className = 'ws-row';
+    const card = document.createElement('div');
+    card.className = 'ws-card';
+
+    const header = document.createElement('div');
+    header.className = 'ws-card-header';
 
     const colorPicker = document.createElement('input');
     colorPicker.type = 'color';
-    colorPicker.style.width = '20px';
-    colorPicker.style.height = '20px';
-    colorPicker.style.padding = '0';
-    colorPicker.style.border = 'none';
+    colorPicker.className = 'ws-color';
     const currentColor = colors[ws.workspaceId] || '';
     colorPicker.value = currentColor || '#cccccc';
     colorPicker.title = currentColor ? 'Workspace color' : 'Set a workspace color';
@@ -83,6 +83,7 @@ async function renderLocalWorkspaces() {
 
     const input = document.createElement('input');
     input.type = 'text';
+    input.className = 'ws-name';
     input.placeholder = isDefault ? 'Not in a Vivaldi workspace…' : 'Name this workspace…';
     const currentLabel = labels[ws.workspaceId] || '';
     // Layer 2's suggested name counts as the effective label even before
@@ -93,38 +94,43 @@ async function renderLocalWorkspaces() {
     // because nothing was actually saved to trigger it.
     const effectiveLabel = currentLabel || suggestedNames[ws.workspaceId] || '';
     input.value = effectiveLabel;
-
-    const count = document.createElement('span');
-    count.className = 'count';
-    count.textContent = `${ws.tabs.length} tab${ws.tabs.length === 1 ? '' : 's'}`;
-
     input.addEventListener('change', async () => {
       await setLabel(ws.workspaceId, input.value.trim());
       renderLocalWorkspaces();
     });
 
-    row.append(colorPicker, input, count);
+    header.append(colorPicker, input);
+    card.append(header);
 
-    const isExcluded = !!excludedWorkspaces[ws.workspaceId];
+    const footer = document.createElement('div');
+    footer.className = 'ws-card-footer';
+
+    const count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = `${ws.tabs.length} tab${ws.tabs.length === 1 ? '' : 's'}`;
+    footer.append(count);
 
     const syncLabel = document.createElement('label');
+    syncLabel.className = 'ws-toggle';
     const syncCheckbox = document.createElement('input');
     syncCheckbox.type = 'checkbox';
+    const isExcluded = !!excludedWorkspaces[ws.workspaceId];
     syncCheckbox.checked = !isExcluded;
     syncCheckbox.addEventListener('change', async () => {
       await setSyncExcluded(ws.workspaceId, !syncCheckbox.checked);
       renderLocalWorkspaces();
     });
     syncLabel.append(syncCheckbox, ' Sync');
-    row.append(syncLabel);
+    footer.append(syncLabel);
 
     if (isExcluded) {
       const notSyncedNote = document.createElement('span');
       notSyncedNote.className = 'count';
       notSyncedNote.textContent = '(not synced)';
-      row.append(notSyncedNote);
+      footer.append(notSyncedNote);
     } else if (effectiveLabel && remoteLabels.has(effectiveLabel)) {
       const mirrorLabel = document.createElement('label');
+      mirrorLabel.className = 'ws-toggle';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = await isMirrored(ws.workspaceId);
@@ -132,19 +138,19 @@ async function renderLocalWorkspaces() {
         await setMirrored(ws.workspaceId, checkbox.checked);
       });
       mirrorLabel.append(checkbox, ' Mirror');
-      row.append(mirrorLabel);
+      footer.append(mirrorLabel);
     }
 
-    localList.append(row);
+    card.append(footer);
 
     if (isDefault) {
       const hint = document.createElement('div');
-      hint.className = 'muted';
-      hint.style.fontSize = '10px';
-      hint.style.margin = '0 0 8px';
+      hint.className = 'ws-hint';
       hint.textContent = 'Tabs Vivaldi doesn\'t assign to any workspace (extension panels, internal pages, etc.)';
-      localList.append(hint);
+      card.append(hint);
     }
+
+    localList.append(card);
   }
 
   if (workspaces.length === 0) {
@@ -180,61 +186,71 @@ async function renderRemoteDevices() {
 
   for (const name of pending) {
     const p = document.createElement('div');
+    p.className = 'pending-device';
     p.textContent = `${name}: syncing…`;
     remoteList.append(p);
   }
 
   for (const device of devices) {
+    const deviceCard = document.createElement('div');
+    deviceCard.className = 'device-card';
+
     const deviceHeader = document.createElement('div');
-    deviceHeader.style.fontWeight = '600';
-    deviceHeader.style.marginTop = '8px';
+    deviceHeader.className = 'device-header';
     const deviceNameSpan = document.createElement('span');
     deviceNameSpan.textContent = device.deviceName || device.deviceId;
     const syncedSpan = document.createElement('span');
-    syncedSpan.className = 'muted';
-    syncedSpan.style.fontWeight = 'normal';
-    syncedSpan.style.fontSize = '11px';
-    syncedSpan.textContent = device.updatedAt ? ` · ${formatRelativeSync(device.updatedAt)}` : '';
+    syncedSpan.className = 'device-synced';
+    syncedSpan.textContent = device.updatedAt ? `· ${formatRelativeSync(device.updatedAt)}` : '';
     deviceHeader.append(deviceNameSpan, syncedSpan);
-    remoteList.append(deviceHeader);
+    deviceCard.append(deviceHeader);
 
     for (const ws of device.workspaces || []) {
-      const wsHeader = document.createElement('div');
-      wsHeader.style.marginLeft = '8px';
-      wsHeader.style.marginTop = '4px';
+      const wsBlock = document.createElement('div');
+      wsBlock.className = 'device-ws';
 
-      const label = ws.label || '(unlabeled)';
+      const wsHeader = document.createElement('div');
+      wsHeader.className = 'device-ws-header';
+
+      if (ws.color) {
+        const dot = document.createElement('span');
+        dot.className = 'ws-dot';
+        dot.style.background = ws.color;
+        wsHeader.append(dot);
+      }
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = ws.label || '(unlabeled)';
+      wsHeader.append(labelSpan);
+
       const openAllBtn = document.createElement('button');
+      openAllBtn.className = 'btn-open-all';
       openAllBtn.textContent = `Open all (${(ws.tabs || []).length})`;
       openAllBtn.addEventListener('click', () => {
         chrome.windows.create({ url: (ws.tabs || []).map((t) => t.url) });
       });
+      wsHeader.append(openAllBtn);
 
-      if (ws.color) {
-        const dot = document.createElement('span');
-        dot.style.display = 'inline-block';
-        dot.style.width = '8px';
-        dot.style.height = '8px';
-        dot.style.borderRadius = '50%';
-        dot.style.marginRight = '4px';
-        dot.style.border = '1px solid var(--border)';
-        dot.style.background = ws.color;
-        wsHeader.append(dot);
-      }
-      wsHeader.append(`${label} `, openAllBtn);
-      remoteList.append(wsHeader);
+      wsBlock.append(wsHeader);
 
+      const tabsBox = document.createElement('div');
+      tabsBox.className = 'device-ws-tabs';
       for (const tab of ws.tabs || []) {
         const tabRow = document.createElement('div');
         tabRow.className = 'tab-link';
-        tabRow.style.marginLeft = '16px';
+        tabRow.title = tab.title || tab.url;
         tabRow.textContent = tab.title || tab.url;
         tabRow.addEventListener('click', () => {
           chrome.tabs.create({ url: tab.url });
         });
-        remoteList.append(tabRow);
+        tabsBox.append(tabRow);
       }
+      wsBlock.append(tabsBox);
+
+      deviceCard.append(wsBlock);
     }
+
+    remoteList.append(deviceCard);
   }
 
   if (devices.length === 0 && pending.length === 0) {

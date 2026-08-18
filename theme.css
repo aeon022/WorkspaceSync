@@ -12,6 +12,8 @@
   --accent-bg: #fdf0d5;
   --accent-border: #e8c896;
   --accent-fg: #5a3d1a;
+  --surface: #f7f7f8;
+  --surface-border: #e2e2e4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -29,6 +31,8 @@
     --accent-bg: #3a2f1a;
     --accent-border: #6b5230;
     --accent-fg: #e8c896;
+    --surface: #272727;
+    --surface-border: #3a3a3a;
   }
 }
 
@@ -65,7 +69,154 @@ a {
   font-size: 12px;
 }
 
+/* Local workspace cards ("This device's workspaces") */
+.ws-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+}
+
+.ws-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ws-color {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ws-name {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  background: var(--input-bg);
+  color: var(--fg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.ws-card-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.ws-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.ws-hint {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: -4px;
+}
+
+/* Remote device cards ("Other devices") */
+.device-card {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+}
+
+.device-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.device-synced {
+  font-weight: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.device-ws + .device-ws {
+  margin-top: 8px;
+}
+
+.device-ws-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ws-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.btn-open-all {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--fg);
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-open-all:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.device-ws-tabs {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 0 14px;
+}
+
+.pending-device {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
 .tab-link {
   cursor: pointer;
+  color: var(--fg);
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-link:hover {
+  background: var(--accent-bg);
   color: var(--link);
 }

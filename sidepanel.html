@@ -8,11 +8,17 @@
     body { font: 13px system-ui, sans-serif; margin: 0; padding: 12px; }
     .header-row { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
     h1 { font-size: 14px; margin: 0; }
-    #optionsBtn { font-size: 11px; padding: 4px 8px; cursor: pointer; }
-    h2 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px; }
-    .ws-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
-    .ws-row input[type="text"] { flex: 1; padding: 4px; background: var(--input-bg); color: var(--fg); border: 1px solid var(--input-border); }
-    .ws-row .count { color: var(--muted-2); font-size: 11px; }
+    #optionsBtn {
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      background: var(--surface);
+      color: var(--fg);
+      border: 1px solid var(--surface-border);
+      border-radius: 12px;
+    }
+    #optionsBtn:hover { background: var(--accent-bg); border-color: var(--accent-border); }
+    h2 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; letter-spacing: 0.03em; }
   </style>
 </head>
 <body>
