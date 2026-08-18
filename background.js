@@ -104,6 +104,7 @@ export async function reconcileMirrors() {
   const device = await getOrCreateDevice();
   const localWorkspaces = await getLocalWorkspaces();
   const labels = await getLabels();
+  const layer2Names = await getLayer2WorkspaceNames();
   const excludedWorkspaces = await getExcludedWorkspaces();
   const { devices: remoteDevices } = await scanSyncFolder(handle, device.id);
 
@@ -113,7 +114,12 @@ export async function reconcileMirrors() {
     // remote tabs in either — otherwise a "private" workspace could still
     // be influenced by another device's data despite being excluded.
     if (excludedWorkspaces[ws.workspaceId]) continue;
-    const label = labels[ws.workspaceId];
+    // Same effective-label fallback writeSnapshot() already uses: Layer 2's
+    // real Vivaldi name counts as the label even if the user never
+    // explicitly typed/saved one (the sidepanel input shows it pre-filled,
+    // but that alone never persists it to the labels store - see
+    // sidepanel.js's matching fallback for the same reason).
+    const label = layer2Names[ws.workspaceId] || labels[ws.workspaceId];
     if (!label) continue;
     if (!(await isMirrored(ws.workspaceId))) continue;
 

@@ -85,7 +85,14 @@ async function renderLocalWorkspaces() {
     input.type = 'text';
     input.placeholder = isDefault ? 'Not in a Vivaldi workspace…' : 'Name this workspace…';
     const currentLabel = labels[ws.workspaceId] || '';
-    input.value = currentLabel || suggestedNames[ws.workspaceId] || '';
+    // Layer 2's suggested name counts as the effective label even before
+    // the user ever touches this field — matches background.js's
+    // reconcileMirrors, which now falls back to it the same way. Without
+    // this, the input shows the real Vivaldi name pre-filled (looking
+    // already configured) while the Mirror checkbox below stays hidden
+    // because nothing was actually saved to trigger it.
+    const effectiveLabel = currentLabel || suggestedNames[ws.workspaceId] || '';
+    input.value = effectiveLabel;
 
     const count = document.createElement('span');
     count.className = 'count';
@@ -116,7 +123,7 @@ async function renderLocalWorkspaces() {
       notSyncedNote.className = 'count';
       notSyncedNote.textContent = '(not synced)';
       row.append(notSyncedNote);
-    } else if (currentLabel && remoteLabels.has(currentLabel)) {
+    } else if (effectiveLabel && remoteLabels.has(effectiveLabel)) {
       const mirrorLabel = document.createElement('label');
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
