@@ -157,12 +157,21 @@ export async function reconcileMirrors() {
         // (not a literal URL) and searches every window/workspace, and this
         // extension's own tab objects never carry vivExtData/workspaceId
         // anyway (see lib/workspace.js) - so matching happens against the
-        // Layer 2 file instead, which already has both the real tab id and
-        // a resolved workspaceId per tab.
-        const candidates = await getLayer2Tabs();
+        // Layer 2 files instead, which already have both a tab id and a
+        // resolved workspaceId per tab.
+        //
+        // getLayer2Tabs() can include another device's snapshot (they share
+        // this sync folder — see lib/workspace.js), whose tab ids mean
+        // nothing on this machine and would either fail chrome.tabs.remove
+        // outright or, on a numeric-id coincidence, remove the wrong local
+        // tab. So the id is only ever trusted once it's confirmed against
+        // this device's own currently-open tabs, by both id and url.
+        const [candidates, localTabs] = await Promise.all([getLayer2Tabs(), chrome.tabs.query({})]);
+        const localById = new Map(localTabs.map((t) => [t.id, t.url]));
         for (const url of httpToClose) {
           const match = candidates.find((t) => t.url === url && t.workspaceId === ws.workspaceId);
           if (!match) continue; // already gone, in a different workspace, or Layer 2 not active
+          if (localById.get(match.id) !== url) continue; // that id isn't actually this device's open tab
           try {
             await chrome.tabs.remove(match.id);
           } catch (err) {

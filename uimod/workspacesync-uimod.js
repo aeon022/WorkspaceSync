@@ -11,16 +11,26 @@
 //
 // So this writes the tab-to-workspace snapshot directly into the same
 // sync folder the extension already has File System Access permission
-// for, as its own file (_layer2.json) - the extension just reads it like
-// any other file in that folder. This context needs its OWN one-time
-// folder grant (permissions are per-origin, chrome-extension://<this
-// context's id> is a different origin than the actual extension), done
-// via the button below.
+// for, as its own file - the extension just reads it like any other file
+// in that folder. This context needs its OWN one-time folder grant
+// (permissions are per-origin, chrome-extension://<this context's id> is a
+// different origin than the actual extension), done via the button below.
+//
+// The filename embeds a random id generated once and kept in this same
+// IndexedDB, alongside the folder handle - confirmed by direct testing: two
+// machines pointed at the same Dropbox-synced folder previously both wrote
+// the literal name "_layer2.json", so whichever device's write synced down
+// last silently became "this device's own tabs" on the OTHER device too
+// (the extension had no way to tell the file wasn't its own). A unique
+// filename per install stops the overwrite; lib/workspace.js additionally
+// never trusts a snapshot's contents wholesale for exactly this reason -
+// see its own comment.
 (function () {
   const DB_NAME = 'workspacesync-layer2';
   const STORE = 'handles';
   const KEY = 'folder';
-  const FILE_NAME = '_layer2.json';
+  const ID_KEY = 'layer2Id';
+  const OLD_FILE_NAME = '_layer2.json';
 
   function openDb() {
     return new Promise((resolve, reject) => {
@@ -49,6 +59,29 @@
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => reject(req.error);
     });
+  }
+
+  // Minted once per install, reused forever after - this is what makes the
+  // filename stable across restarts instead of a fresh name (and a fresh
+  // orphaned file) every time this script runs.
+  async function getOrCreateLayer2Id() {
+    const db = await openDb();
+    const existing = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(ID_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+    if (existing) return existing;
+
+    const id = crypto.randomUUID().slice(0, 8);
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(id, ID_KEY);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    return id;
   }
 
   async function verifyPermission(handle, requestIfNeeded) {
@@ -131,9 +164,10 @@
     if (!window.vivaldi?.prefs?.get || !chrome?.tabs?.query) return;
 
     try {
-      const [tabs, workspacesPref] = await Promise.all([
+      const [tabs, workspacesPref, layer2Id] = await Promise.all([
         queryAllTabs(),
-        window.vivaldi.prefs.get('vivaldi.workspaces.list')
+        window.vivaldi.prefs.get('vivaldi.workspaces.list'),
+        getOrCreateLayer2Id()
       ]);
 
       const workspaceNames = {};
@@ -151,10 +185,19 @@
         workspaceId: normalizeWorkspaceId(parseVivExtData(tab).workspaceId)
       }));
 
-      const fileHandle = await folderHandle.getFileHandle(FILE_NAME, { create: true });
+      const fileHandle = await folderHandle.getFileHandle(`_layer2-${layer2Id}.json`, { create: true });
       const writable = await fileHandle.createWritable();
       await writable.write(JSON.stringify({ updatedAt: Date.now(), tabs: mappedTabs, workspaceNames }, null, 2));
       await writable.close();
+
+      // One-time cleanup: the old shared filename, if a previous version of
+      // this script left one behind, no longer gets written to and would
+      // otherwise sit there as stale, misleading data indefinitely.
+      try {
+        await folderHandle.removeEntry(OLD_FILE_NAME);
+      } catch {
+        // already gone, or never existed - fine either way
+      }
 
       setStatus(`✅ WorkspaceSync: ${folderHandle.name}`, true);
     } catch (err) {
