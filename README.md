@@ -1,4 +1,4 @@
-# WorkspaceSync
+# DeckMirror
 
 Browse your Vivaldi workspaces and open tabs across devices, from a
 sidepanel — and optionally keep a workspace's tabs in sync between two
@@ -31,7 +31,7 @@ No build step, no `npm install` — plain JS/HTML/CSS.
 ### 1. Device name and sync folder
 
 Open the extension's **Options** page (gear icon in the sidepanel, or
-`vivaldi://extensions` → WorkspaceSync → Details → Extension options).
+`vivaldi://extensions` → DeckMirror → Details → Extension options).
 
 - **Device name** — pre-filled with something generic and not very useful
   (there's no browser API that exposes your machine's real name to an

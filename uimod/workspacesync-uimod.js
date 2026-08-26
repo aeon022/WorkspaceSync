@@ -149,11 +149,11 @@
       const handle = await window.showDirectoryPicker({ id: 'workspacesync-layer2', mode: 'readwrite' });
       await saveHandle(handle);
       folderHandle = handle;
-      setStatus(`✅ WorkspaceSync: ${handle.name}`, true);
+      setStatus(`✅ DeckMirror: ${handle.name}`, true);
       await writeSnapshot();
     } catch (err) {
-      console.warn('[WorkspaceSync UI mod] folder pick failed', err);
-      setStatus('🔴 WorkspaceSync: click to connect');
+      console.warn('[DeckMirror UI mod] folder pick failed', err);
+      setStatus('🔴 DeckMirror: click to connect');
     }
   }
 
@@ -199,24 +199,24 @@
         // already gone, or never existed - fine either way
       }
 
-      setStatus(`✅ WorkspaceSync: ${folderHandle.name}`, true);
+      setStatus(`✅ DeckMirror: ${folderHandle.name}`, true);
     } catch (err) {
-      console.warn('[WorkspaceSync UI mod] failed to write snapshot', err);
+      console.warn('[DeckMirror UI mod] failed to write snapshot', err);
     }
   }
 
   async function init() {
     const handle = await loadHandle();
     if (!handle) {
-      setStatus('🔴 WorkspaceSync: click to connect');
+      setStatus('🔴 DeckMirror: click to connect');
       return;
     }
     folderHandle = handle;
     if (await verifyPermission(handle, false)) {
-      setStatus(`✅ WorkspaceSync: ${handle.name}`, true);
+      setStatus(`✅ DeckMirror: ${handle.name}`, true);
       await writeSnapshot();
     } else {
-      setStatus('🟡 WorkspaceSync: click to reconnect');
+      setStatus('🟡 DeckMirror: click to reconnect');
     }
   }
 

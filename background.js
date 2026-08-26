@@ -154,7 +154,7 @@ export async function reconcileMirrors() {
         try {
           await chrome.tabs.create({ url });
         } catch (err) {
-          console.warn('[WorkspaceSync] failed to open mirrored tab', url, err);
+          console.warn('[DeckMirror] failed to open mirrored tab', url, err);
         }
       }
 
@@ -181,7 +181,7 @@ export async function reconcileMirrors() {
           try {
             await chrome.tabs.remove(match.id);
           } catch (err) {
-            console.warn('[WorkspaceSync] failed to close mirrored tab', url, err);
+            console.warn('[DeckMirror] failed to close mirrored tab', url, err);
           }
         }
       }
@@ -255,7 +255,7 @@ async function checkOwnInbox() {
   try {
     await chrome.tabs.create({ url: entry.url });
   } catch (err) {
-    console.warn('[WorkspaceSync] failed to open tab sent from another device', entry.url, err);
+    console.warn('[DeckMirror] failed to open tab sent from another device', entry.url, err);
   }
   await setLastInboxTs(entry.ts);
 }
