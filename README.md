@@ -69,8 +69,8 @@ automatically (a Vivaldi update replaces `window.html` and silently wipes
 the patch):
 
 ```bash
-cp scripts/com.workspacesync.uimod-injector.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.workspacesync.uimod-injector.plist
+cp scripts/com.deckmirror.uimod-injector.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.deckmirror.uimod-injector.plist
 ```
 
 > The `.plist` has your repo path baked in. If you cloned somewhere other

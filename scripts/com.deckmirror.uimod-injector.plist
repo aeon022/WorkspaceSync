@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.workspacesync.uimod-injector</string>
+  <string>com.deckmirror.uimod-injector</string>
   <key>ProgramArguments</key>
   <array>
     <string>/Users/gweiher/Developing/Projects/Extensions/WorkspaceSync/scripts/inject-uimod.sh</string>
@@ -13,8 +13,8 @@
   <key>StartInterval</key>
   <integer>3600</integer>
   <key>StandardOutPath</key>
-  <string>/Users/gweiher/Library/Logs/workspacesync-uimod-injector.log</string>
+  <string>/Users/gweiher/Library/Logs/deckmirror-uimod-injector.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/gweiher/Library/Logs/workspacesync-uimod-injector.log</string>
+  <string>/Users/gweiher/Library/Logs/deckmirror-uimod-injector.log</string>
 </dict>
 </plist>

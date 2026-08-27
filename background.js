@@ -75,7 +75,7 @@ export async function writeSnapshot() {
     return {
       localId: ws.workspaceId,
       // Layer 2's real Vivaldi workspace name wins when available — that's
-      // the whole point of it (see uimod/workspacesync-uimod.js) — falling
+      // the whole point of it (see uimod/deckmirror-uimod.js) — falling
       // back to whatever the user typed by hand, then whatever was already
       // written last time, so a workspace never regresses to blank once
       // it's had a name from either source.

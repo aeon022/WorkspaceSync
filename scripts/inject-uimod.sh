@@ -1,5 +1,5 @@
 #!/bin/bash
-# Injects uimod/workspacesync-uimod.js into Vivaldi's own privileged UI
+# Injects uimod/deckmirror-uimod.js into Vivaldi's own privileged UI
 # context by patching the browser's installed window.html - this is the
 # only way to get JS execution there; Vivaldi's official "Custom UI
 # Modifications" setting only supports CSS, not JS (verified, not assumed).
@@ -12,8 +12,8 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_JS="$REPO_DIR/uimod/workspacesync-uimod.js"
-SCRIPT_TAG='<script src="workspacesync-uimod.js"></script>'
+SOURCE_JS="$REPO_DIR/uimod/deckmirror-uimod.js"
+SCRIPT_TAG='<script src="deckmirror-uimod.js"></script>'
 VIVALDI_APP="/Applications/Vivaldi.app"
 
 if [ ! -f "$SOURCE_JS" ]; then
@@ -30,7 +30,7 @@ if [ -z "$WINDOW_HTML" ]; then
 fi
 
 TARGET_DIR="$(dirname "$WINDOW_HTML")"
-TARGET_JS="$TARGET_DIR/workspacesync-uimod.js"
+TARGET_JS="$TARGET_DIR/deckmirror-uimod.js"
 
 # Always refresh the copy (relative src, not file://, to avoid CSP issues
 # loading a script from outside window.html's own origin/directory) so
@@ -42,8 +42,8 @@ if grep -qF "$SCRIPT_TAG" "$WINDOW_HTML"; then
   exit 0
 fi
 
-cp "$WINDOW_HTML" "$WINDOW_HTML.workspacesync-backup"
+cp "$WINDOW_HTML" "$WINDOW_HTML.deckmirror-backup"
 sed -i '' "s#</body>#  ${SCRIPT_TAG}\n</body>#" "$WINDOW_HTML"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') injected into: $WINDOW_HTML"
-echo "backup saved at: $WINDOW_HTML.workspacesync-backup"
+echo "backup saved at: $WINDOW_HTML.deckmirror-backup"
