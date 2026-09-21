@@ -33,7 +33,7 @@
   const OLD_FILE_NAME = '_layer2.json';
   const EXTENSION_ID = 'cmjniggmemdcamengapegfpfhdinbejo';
 
-  let extensionEnabled = false;
+  let extensionEnabled = true;
   let writeTimeout = null;
 
   function openDb() {
@@ -95,17 +95,15 @@
   function parseVivExtData(tab) {
     if (!tab.vivExtData) return {};
     try {
-      return JSON.parse(tab.vivExtData);
+      return typeof tab.vivExtData === 'string' ? JSON.parse(tab.vivExtData) : tab.vivExtData;
     } catch {
       return {};
     }
   }
 
   function normalizeWorkspaceId(raw) {
-    if (raw === undefined || raw === null) return 'default';
-    const n = Math.round(Number(raw));
-    if (Number.isNaN(n)) return 'default';
-    return String(n);
+    if (raw === undefined || raw === null || raw === '' || raw === 0 || raw === '0') return 'default';
+    return String(raw);
   }
 
   function queryAllTabs() {
@@ -113,28 +111,36 @@
   }
 
   function checkExtensionEnabled() {
-    if (!chrome?.management) {
+    if (!chrome?.management?.get) {
       return Promise.resolve(true);
     }
     return new Promise((resolve) => {
-      chrome.management.get(EXTENSION_ID, (info) => {
-        if (!chrome.runtime?.lastError && info) {
-          resolve(!!info.enabled);
-          return;
-        }
-        if (chrome.management.getAll) {
-          chrome.management.getAll((all) => {
-            if (chrome.runtime?.lastError || !all) {
-              resolve(false);
-              return;
-            }
-            const ext = all.find((e) => e.id === EXTENSION_ID || e.name === 'DeckMirror' || e.name === 'WorkspaceSync');
-            resolve(!!ext?.enabled);
-          });
-        } else {
-          resolve(false);
-        }
-      });
+      try {
+        chrome.management.get(EXTENSION_ID, (info) => {
+          if (!chrome.runtime?.lastError && info) {
+            resolve(!!info.enabled);
+            return;
+          }
+          if (chrome.management.getAll) {
+            chrome.management.getAll((all) => {
+              if (chrome.runtime?.lastError || !all) {
+                resolve(true); // Don't block if query fails
+                return;
+              }
+              const ext = all.find((e) => e.id === EXTENSION_ID || e.name === 'DeckMirror' || e.name === 'WorkspaceSync');
+              if (ext) {
+                resolve(!!ext.enabled);
+              } else {
+                resolve(true);
+              }
+            });
+          } else {
+            resolve(true);
+          }
+        });
+      } catch {
+        resolve(true);
+      }
     });
   }
 
@@ -174,7 +180,7 @@
       hideTimer = setTimeout(() => {
         btn.style.opacity = '0';
         btn.style.pointerEvents = 'none';
-      }, 2000);
+      }, 2500);
     }
   }
 
@@ -187,7 +193,7 @@
       await writeSnapshot();
     } catch (err) {
       console.warn('[DeckMirror UI mod] folder pick failed', err);
-      setStatus('🔴 DeckMirror: click to connect');
+      setStatus('🔴 DeckMirror: Klicke um Sync-Ordner zu verbinden');
     }
   }
 
@@ -196,12 +202,12 @@
   async function writeSnapshot() {
     if (!extensionEnabled) return;
     if (!folderHandle || !(await verifyPermission(folderHandle, false))) return;
-    if (!window.vivaldi?.prefs?.get || !chrome?.tabs?.query) return;
+    if (!chrome?.tabs?.query) return;
 
     try {
       const [tabs, workspacesPref, layer2Id] = await Promise.all([
         queryAllTabs(),
-        window.vivaldi.prefs.get('vivaldi.workspaces.list'),
+        window.vivaldi?.prefs?.get ? window.vivaldi.prefs.get('vivaldi.workspaces.list') : Promise.resolve({ value: [] }),
         getOrCreateLayer2Id()
       ]);
 
@@ -210,15 +216,18 @@
         workspaceNames[normalizeWorkspaceId(ws.id)] = ws.name;
       }
 
-      const mappedTabs = tabs.map((tab) => ({
-        id: tab.id,
-        url: tab.url,
-        title: tab.title || tab.url,
-        pinned: !!tab.pinned,
-        favIconUrl: tab.favIconUrl || '',
-        index: tab.index,
-        workspaceId: normalizeWorkspaceId(parseVivExtData(tab).workspaceId)
-      }));
+      const mappedTabs = tabs.map((tab) => {
+        const ext = parseVivExtData(tab);
+        return {
+          id: tab.id,
+          url: tab.url,
+          title: tab.title || tab.url,
+          pinned: !!tab.pinned,
+          favIconUrl: tab.favIconUrl || '',
+          index: tab.index,
+          workspaceId: normalizeWorkspaceId(ext.workspaceId)
+        };
+      });
 
       const fileHandle = await folderHandle.getFileHandle(`_layer2-${layer2Id}.json`, { create: true });
       const writable = await fileHandle.createWritable();
@@ -265,7 +274,7 @@
 
     const handle = await loadHandle();
     if (!handle) {
-      setStatus('🔴 DeckMirror: click to connect');
+      setStatus('🔴 DeckMirror: Klicke um Sync-Ordner zu verbinden');
       return;
     }
     folderHandle = handle;
@@ -273,7 +282,7 @@
       setStatus(`✅ DeckMirror: ${handle.name}`, true);
       await writeSnapshot();
     } else {
-      setStatus('🟡 DeckMirror: click to reconnect');
+      setStatus('🟡 DeckMirror: Klicke um Berechtigung zu erneuern');
     }
   }
 
