@@ -1,0 +1,113 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "Peer-to-Peer Vivaldi Workspace & Tab Synchronization across all your machines. Zero cloud, zero tracking, instant convergence." } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+  <meta name="description" content={description}>
+  <link rel="icon" type="image/png" href="./favicon.png">
+  
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content={title}>
+  <meta property="og:description" content={description}>
+  <meta property="og:image" content="./deckmirror-hero.png">
+  
+  <style is:global>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      background-color: #08090E;
+      color: #F1F5F9;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow-x: hidden;
+    }
+    .noise-bg {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+    .monolith-card {
+      position: relative;
+      background: #0F1118;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.25s ease-out;
+    }
+    .monolith-card:hover {
+      border-color: rgba(52, 211, 153, 0.35);
+      box-shadow: 0 0 25px rgba(52, 211, 153, 0.08);
+    }
+    .tick-tl, .tick-tr, .tick-bl, .tick-br {
+      position: absolute;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.2);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .tick-tl { top: -6px; left: -4px; }
+    .tick-tr { top: -6px; right: -4px; }
+    .tick-bl { bottom: -6px; left: -4px; }
+    .tick-br { bottom: -6px; right: -4px; }
+  </style>
+</head>
+<body class="noise-bg min-h-screen flex flex-col selection:bg-emerald-500 selection:text-black">
+  <!-- Top Monolith Header -->
+  <header class="sticky top-0 z-50 bg-[#08090E]/90 backdrop-blur-md border-b border-white/10 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="https://pulsar-ext.space" class="px-2 py-0.5 bg-white/10 border border-white/20 text-white text-xs font-mono font-semibold tracking-widest hover:bg-white hover:text-black transition-colors">
+        A38
+      </a>
+      <div class="flex items-center gap-2 text-xs">
+        <a href="https://pulsar-ext.space" class="font-semibold text-slate-300 hover:text-emerald-400 transition-colors">PULSAR</a>
+        <span class="text-slate-600">/</span>
+        <span class="text-emerald-400 font-mono font-semibold">DECKMIRROR</span>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-4 text-xs font-mono">
+      <nav class="hidden md:flex items-center gap-6 text-slate-400">
+        <a href="#features" class="hover:text-white transition-colors">Features</a>
+        <a href="#architecture" class="hover:text-white transition-colors">Architecture</a>
+        <a href="#install" class="hover:text-white transition-colors">Install</a>
+        <a href="#faq" class="hover:text-white transition-colors">FAQ</a>
+      </nav>
+      <div class="flex items-center gap-2 px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-[10px] tracking-wide">v0.1.0 · MV3</span>
+      </div>
+      <a href="https://buy.polar.sh/polar_cl_DrOMaecRuEdvn8seYYegzMt0jEDbuY92X4zMd2NkGD8" target="_blank" class="hidden sm:inline-flex px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold tracking-wider uppercase transition-colors text-[11px]">
+        Support Dev
+      </a>
+    </div>
+  </header>
+
+  <main class="flex-grow">
+    <slot />
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/10 bg-[#06070A] py-12 px-4 lg:px-8 mt-24 text-xs font-mono text-slate-500">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="flex items-center gap-3">
+        <span class="px-2 py-0.5 bg-white/5 border border-white/10 text-slate-300 text-[10px]">PULSAR MATRIX</span>
+        <span>© 2026 ABTEILUNG83 // Gerwin Weiher</span>
+      </div>
+      <div class="flex items-center gap-6 text-slate-400">
+        <a href="https://pulsar-ext.space" class="hover:text-white transition-colors">Extension Matrix</a>
+        <a href="https://github.com/aeon022/WorkspaceSync" class="hover:text-white transition-colors" target="_blank">GitHub</a>
+        <a href="https://buy.polar.sh/polar_cl_DrOMaecRuEdvn8seYYegzMt0jEDbuY92X4zMd2NkGD8" class="hover:text-emerald-400 transition-colors" target="_blank">Polar.sh</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

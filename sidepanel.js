@@ -21,12 +21,48 @@ function formatRelativeSync(isoString) {
   return relativeTimeFormatter.format(Math.round(diffHour / 24), 'day');
 }
 
+function extractDomain(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
 document.getElementById('optionsBtn').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
 });
 
 const syncNowBtn = document.getElementById('syncNowBtn');
 const syncIcon = document.getElementById('syncIcon');
+const searchInput = document.getElementById('tabSearchInput');
+const searchClearBtn = document.getElementById('searchClearBtn');
+const localTabTotal = document.getElementById('localTabTotal');
+const remoteDeviceCount = document.getElementById('remoteDeviceCount');
+
+let searchQuery = '';
+const collapsedWorkspaces = new Set();
+
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value.trim().toLowerCase();
+    searchClearBtn.style.display = searchQuery ? 'block' : 'none';
+    renderLocalWorkspaces();
+    renderRemoteDevices();
+  });
+}
+
+if (searchClearBtn) {
+  searchClearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    searchQuery = '';
+    searchClearBtn.style.display = 'none';
+    renderLocalWorkspaces();
+    renderRemoteDevices();
+    searchInput.focus();
+  });
+}
 
 async function triggerManualSync() {
   if (!syncNowBtn) return;
@@ -79,16 +115,42 @@ async function renderLocalWorkspaces() {
   ]);
   localList.innerHTML = '';
 
+  let totalTabs = 0;
+  for (const ws of workspaces) {
+    totalTabs += ws.tabs.length;
+  }
+  if (localTabTotal) localTabTotal.textContent = `${totalTabs} tab${totalTabs === 1 ? '' : 's'}`;
+
   if (!layer2Active) {
-    const note = document.createElement('p');
-    note.className = 'muted';
-    note.style.fontSize = '11px';
-    note.style.margin = '0 0 8px';
-    note.textContent = 'Workspace detection needs setup — see Options. Until then, tabs appear in one group.';
+    const note = document.createElement('div');
+    note.className = 'empty-state';
+    note.style.border = '1px dashed var(--surface-border)';
+    note.style.borderRadius = '6px';
+    note.style.marginBottom = '8px';
+    note.innerHTML = '⚡ <strong>Layer 2 Hook:</strong> Run <code>bash scripts/inject-uimod.sh</code> for real-time workspace names.';
     localList.append(note);
   }
 
+  let renderedCount = 0;
+
   for (const ws of workspaces) {
+    const currentLabel = labels[ws.workspaceId] || '';
+    const effectiveLabel = currentLabel || suggestedNames[ws.workspaceId] || '';
+    const isDefault = ws.workspaceId === 'default';
+
+    // Filter by search query if present
+    const matchesWorkspaceName = effectiveLabel.toLowerCase().includes(searchQuery);
+    const matchingTabs = ws.tabs.filter((t) => {
+      if (!searchQuery) return true;
+      return (t.title && t.title.toLowerCase().includes(searchQuery)) ||
+             (t.url && t.url.toLowerCase().includes(searchQuery));
+    });
+
+    if (searchQuery && !matchesWorkspaceName && matchingTabs.length === 0) {
+      continue;
+    }
+
+    renderedCount++;
     const card = document.createElement('div');
     card.className = 'ws-card';
 
@@ -98,23 +160,19 @@ async function renderLocalWorkspaces() {
     const colorPicker = document.createElement('input');
     colorPicker.type = 'color';
     colorPicker.className = 'ws-color';
-    const currentColor = colors[ws.workspaceId] || '';
-    colorPicker.value = currentColor || '#cccccc';
-    colorPicker.title = currentColor ? 'Workspace color' : 'Set a workspace color';
+    const currentColor = colors[ws.workspaceId] || '#34D399';
+    colorPicker.value = currentColor;
+    colorPicker.title = 'Workspace color';
     colorPicker.addEventListener('change', async () => {
       await setColor(ws.workspaceId, colorPicker.value);
       chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       renderLocalWorkspaces();
     });
 
-    const isDefault = ws.workspaceId === 'default';
-
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'ws-name';
     input.placeholder = isDefault ? 'Not in a Vivaldi workspace…' : 'Name this workspace…';
-    const currentLabel = labels[ws.workspaceId] || '';
-    const effectiveLabel = currentLabel || suggestedNames[ws.workspaceId] || '';
     input.value = effectiveLabel;
     input.addEventListener('change', async () => {
       await setLabel(ws.workspaceId, input.value.trim());
@@ -129,9 +187,14 @@ async function renderLocalWorkspaces() {
     footer.className = 'ws-card-footer';
 
     const count = document.createElement('span');
-    count.className = 'count';
+    count.className = 'count-pill';
     count.textContent = `${ws.tabs.length} tab${ws.tabs.length === 1 ? '' : 's'}`;
     footer.append(count);
+
+    const controls = document.createElement('div');
+    controls.style.display = 'flex';
+    controls.style.gap = '10px';
+    controls.style.alignItems = 'center';
 
     const syncLabel = document.createElement('label');
     syncLabel.className = 'ws-toggle';
@@ -145,13 +208,14 @@ async function renderLocalWorkspaces() {
       renderLocalWorkspaces();
     });
     syncLabel.append(syncCheckbox, ' Sync');
-    footer.append(syncLabel);
+    controls.append(syncLabel);
 
     if (isExcluded) {
       const notSyncedNote = document.createElement('span');
-      notSyncedNote.className = 'count';
-      notSyncedNote.textContent = '(not synced)';
-      footer.append(notSyncedNote);
+      notSyncedNote.className = 'count-pill';
+      notSyncedNote.style.color = '#EF4444';
+      notSyncedNote.textContent = 'excluded';
+      controls.append(notSyncedNote);
     } else if (effectiveLabel && remoteLabels.has(effectiveLabel)) {
       const mirrorLabel = document.createElement('label');
       mirrorLabel.className = 'ws-toggle';
@@ -163,23 +227,24 @@ async function renderLocalWorkspaces() {
         chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       });
       mirrorLabel.append(checkbox, ' Mirror');
-      footer.append(mirrorLabel);
+      controls.append(mirrorLabel);
     }
 
+    footer.append(controls);
     card.append(footer);
 
     if (isDefault) {
       const hint = document.createElement('div');
       hint.className = 'ws-hint';
-      hint.textContent = 'Tabs Vivaldi doesn\'t assign to any workspace (extension panels, internal pages, etc.)';
+      hint.textContent = 'Tabs outside Vivaldi workspaces (extensions, speed dials)';
       card.append(hint);
     }
 
     localList.append(card);
   }
 
-  if (workspaces.length === 0) {
-    localList.textContent = 'No open tabs found.';
+  if (renderedCount === 0) {
+    localList.innerHTML = `<div class="empty-state">${searchQuery ? 'No matching workspaces found.' : 'No open tabs found.'}</div>`;
   }
 }
 
@@ -192,23 +257,29 @@ const remoteList = document.getElementById('remoteDevices');
 async function renderRemoteDevices() {
   const handle = await loadHandle();
   if (!handle) {
-    remoteList.textContent = 'No sync folder configured — set one up in Options.';
+    remoteList.innerHTML = '<div class="empty-state">No sync folder configured — set one up in Options.</div>';
     return;
   }
   if (!(await verifyPermission(handle, false))) {
-    remoteList.textContent = 'Sync folder permission lost — reconnect it in Options.';
+    remoteList.innerHTML = '<div class="empty-state">Sync folder permission lost — reconnect it in Options.</div>';
     return;
   }
 
   const { devices, pending } = await scanSyncFolder(handle, (await getOrCreateDevice()).id);
   remoteList.innerHTML = '';
 
+  if (remoteDeviceCount) {
+    remoteDeviceCount.textContent = `${devices.length} device${devices.length === 1 ? '' : 's'}`;
+  }
+
   for (const name of pending) {
     const p = document.createElement('div');
     p.className = 'pending-device';
-    p.textContent = `${name}: syncing…`;
+    p.textContent = `⏳ ${name}: syncing from cloud…`;
     remoteList.append(p);
   }
+
+  let totalRemoteRendered = 0;
 
   for (const device of devices) {
     const deviceCard = document.createElement('div');
@@ -216,64 +287,159 @@ async function renderRemoteDevices() {
 
     const deviceHeader = document.createElement('div');
     deviceHeader.className = 'device-header';
-    const deviceNameSpan = document.createElement('span');
-    deviceNameSpan.textContent = device.deviceName || device.deviceId;
+    
+    const deviceTitle = document.createElement('div');
+    deviceTitle.className = 'device-title';
+    deviceTitle.innerHTML = `<span>💻</span> <span>${device.deviceName || device.deviceId}</span>`;
+    
     const syncedSpan = document.createElement('span');
     syncedSpan.className = 'device-synced';
-    syncedSpan.textContent = device.updatedAt ? `· ${formatRelativeSync(device.updatedAt)}` : '';
-    deviceHeader.append(deviceNameSpan, syncedSpan);
+    syncedSpan.textContent = device.updatedAt ? formatRelativeSync(device.updatedAt) : '';
+    
+    deviceHeader.append(deviceTitle, syncedSpan);
     deviceCard.append(deviceHeader);
 
+    let deviceHasMatchingWs = false;
+
     for (const ws of device.workspaces || []) {
+      const wsLabel = ws.label || '(unlabeled)';
+      const wsKey = `${device.deviceId}-${wsLabel}`;
+
+      const matchesWs = wsLabel.toLowerCase().includes(searchQuery);
+      const matchingTabs = (ws.tabs || []).filter((t) => {
+        if (!searchQuery) return true;
+        return (t.title && t.title.toLowerCase().includes(searchQuery)) ||
+               (t.url && t.url.toLowerCase().includes(searchQuery));
+      });
+
+      if (searchQuery && !matchesWs && matchingTabs.length === 0) {
+        continue;
+      }
+
+      deviceHasMatchingWs = true;
+      totalRemoteRendered++;
+
       const wsBlock = document.createElement('div');
       wsBlock.className = 'device-ws';
 
+      const isCollapsed = collapsedWorkspaces.has(wsKey) && !searchQuery;
+
       const wsHeader = document.createElement('div');
       wsHeader.className = 'device-ws-header';
+
+      const titleGroup = document.createElement('div');
+      titleGroup.className = 'ws-title-group';
+
+      const arrow = document.createElement('span');
+      arrow.className = `accordion-arrow ${isCollapsed ? 'collapsed' : ''}`;
+      arrow.textContent = '▼';
+      titleGroup.append(arrow);
 
       if (ws.color) {
         const dot = document.createElement('span');
         dot.className = 'ws-dot';
         dot.style.background = ws.color;
-        wsHeader.append(dot);
+        titleGroup.append(dot);
       }
 
       const labelSpan = document.createElement('span');
-      labelSpan.textContent = ws.label || '(unlabeled)';
-      wsHeader.append(labelSpan);
+      labelSpan.className = 'ws-label-text';
+      labelSpan.textContent = wsLabel;
+      titleGroup.append(labelSpan);
+
+      const countBadge = document.createElement('span');
+      countBadge.className = 'count-pill';
+      countBadge.textContent = `${(ws.tabs || []).length}`;
+      titleGroup.append(countBadge);
+
+      const actionsGroup = document.createElement('div');
+      actionsGroup.className = 'ws-actions-group';
 
       const openAllBtn = document.createElement('button');
       openAllBtn.className = 'btn-open-all';
-      openAllBtn.textContent = `Open all (${(ws.tabs || []).length})`;
-      openAllBtn.addEventListener('click', () => {
+      openAllBtn.textContent = 'Open all';
+      openAllBtn.title = `Open all ${(ws.tabs || []).length} tabs in a new window`;
+      openAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         chrome.windows.create({ url: (ws.tabs || []).map((t) => t.url) });
       });
-      wsHeader.append(openAllBtn);
+      actionsGroup.append(openAllBtn);
 
+      wsHeader.append(titleGroup, actionsGroup);
       wsBlock.append(wsHeader);
 
       const tabsBox = document.createElement('div');
-      tabsBox.className = 'device-ws-tabs';
-      for (const tab of ws.tabs || []) {
-        const tabRow = document.createElement('div');
-        tabRow.className = 'tab-link';
-        tabRow.title = tab.title || tab.url;
-        tabRow.textContent = tab.title || tab.url;
-        tabRow.addEventListener('click', () => {
+      tabsBox.className = `device-ws-tabs ${isCollapsed ? 'collapsed' : ''}`;
+
+      const tabsToDisplay = searchQuery ? matchingTabs : (ws.tabs || []);
+
+      for (const tab of tabsToDisplay) {
+        const tabRow = document.createElement('a');
+        tabRow.className = 'tab-item';
+        tabRow.href = tab.url;
+        tabRow.title = `${tab.title || tab.url}\n${tab.url}`;
+
+        if (tab.favIconUrl && tab.favIconUrl.startsWith('http')) {
+          const img = document.createElement('img');
+          img.className = 'tab-favicon';
+          img.src = tab.favIconUrl;
+          img.onerror = () => {
+            img.style.display = 'none';
+          };
+          tabRow.append(img);
+        } else {
+          const ph = document.createElement('span');
+          ph.className = 'tab-favicon-placeholder';
+          ph.textContent = '🌐';
+          tabRow.append(ph);
+        }
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'tab-title';
+        titleSpan.textContent = tab.title || tab.url;
+        tabRow.append(titleSpan);
+
+        const domain = extractDomain(tab.url);
+        if (domain) {
+          const domainSpan = document.createElement('span');
+          domainSpan.className = 'tab-domain';
+          domainSpan.textContent = domain;
+          tabRow.append(domainSpan);
+        }
+
+        tabRow.addEventListener('click', (e) => {
+          e.preventDefault();
           chrome.tabs.create({ url: tab.url });
         });
+
         tabsBox.append(tabRow);
       }
-      wsBlock.append(tabsBox);
 
+      wsHeader.addEventListener('click', () => {
+        if (collapsedWorkspaces.has(wsKey)) {
+          collapsedWorkspaces.delete(wsKey);
+          tabsBox.classList.remove('collapsed');
+          arrow.classList.remove('collapsed');
+        } else {
+          collapsedWorkspaces.add(wsKey);
+          tabsBox.classList.add('collapsed');
+          arrow.classList.add('collapsed');
+        }
+      });
+
+      wsBlock.append(tabsBox);
       deviceCard.append(wsBlock);
     }
 
-    remoteList.append(deviceCard);
+    if (deviceHasMatchingWs || !searchQuery) {
+      remoteList.append(deviceCard);
+    }
   }
 
   if (devices.length === 0 && pending.length === 0) {
-    remoteList.textContent = 'No other devices found in the sync folder yet.';
+    remoteList.innerHTML = '<div class="empty-state">No other devices found in the sync folder yet.</div>';
+  } else if (totalRemoteRendered === 0 && searchQuery) {
+    remoteList.innerHTML = '<div class="empty-state">No matching remote tabs found.</div>';
   }
 }
 
@@ -288,15 +454,19 @@ async function renderFolderBanner() {
   folderBanner.innerHTML = '';
 
   if (!handle) {
-    folderBanner.textContent = 'No sync folder configured yet — set one up in Options.';
+    folderBanner.textContent = 'No sync folder configured yet.';
+    const btn = document.createElement('button');
+    btn.textContent = 'Open Settings';
+    btn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+    folderBanner.append(btn);
     folderBanner.style.display = 'block';
     return;
   }
 
   if (!(await verifyPermission(handle, false))) {
-    folderBanner.textContent = 'Sync folder permission was lost. ';
+    folderBanner.textContent = 'Sync folder permission was lost after restart.';
     const btn = document.createElement('button');
-    btn.textContent = 'Reconnect in Options';
+    btn.textContent = 'Reconnect Folder';
     btn.addEventListener('click', () => chrome.runtime.openOptionsPage());
     folderBanner.append(btn);
     folderBanner.style.display = 'block';
