@@ -7,7 +7,7 @@ import { getExcludedWorkspaces, setSyncExcluded } from './lib/syncFlags.js';
 import { getColors, setColor } from './lib/workspaceColors.js';
 import { getOrCreateDevice } from './lib/device.js';
 import { loadHandle } from './lib/handleStore.js';
-import { verifyPermission, scanSyncFolder } from './lib/syncFolder.js';
+import { verifyPermission, scanSyncFolder, deleteDeviceFile } from './lib/syncFolder.js';
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
@@ -318,15 +318,41 @@ async function renderRemoteDevices() {
     const deviceHeader = document.createElement('div');
     deviceHeader.className = 'device-header';
     
+    const ownDevice = await getOrCreateDevice();
+    const isOldSessionOfCurrentDevice = device.deviceName && ownDevice.name && (device.deviceName === ownDevice.name);
+
     const deviceTitle = document.createElement('div');
     deviceTitle.className = 'device-title';
-    deviceTitle.innerHTML = `<span>💻</span> <span>${device.deviceName || device.deviceId}</span>`;
-    
+    deviceTitle.innerHTML = `<span>💻</span> <span>${device.deviceName || device.deviceId}</span>` + 
+      (isOldSessionOfCurrentDevice ? ` <span class="count-pill" style="color:#F59E0B; border:1px solid rgba(245,158,11,0.3); font-size:9px;">(Alte Sitzung)</span>` : '');
+
+    const headerRight = document.createElement('div');
+    headerRight.style.display = 'flex';
+    headerRight.style.alignItems = 'center';
+    headerRight.style.gap = '6px';
+
     const syncedSpan = document.createElement('span');
     syncedSpan.className = 'device-synced';
     syncedSpan.textContent = device.updatedAt ? formatRelativeSync(device.updatedAt) : '';
-    
-    deviceHeader.append(deviceTitle, syncedSpan);
+    headerRight.append(syncedSpan);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-header';
+    deleteBtn.style.padding = '2px 5px';
+    deleteBtn.style.fontSize = '10px';
+    deleteBtn.textContent = '🗑️';
+    deleteBtn.title = 'Diesen alten Snapshot aus dem Sync-Ordner löschen';
+    deleteBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm(`Alten Snapshot für "${device.deviceName || device.deviceId}" aus dem Sync-Ordner entfernen?`)) {
+        await deleteDeviceFile(handle, device.deviceId);
+        lastRemoteStateKey = '';
+        await renderRemoteDevices();
+      }
+    });
+    headerRight.append(deleteBtn);
+
+    deviceHeader.append(deviceTitle, headerRight);
     deviceCard.append(deviceHeader);
 
     let deviceHasMatchingWs = false;
