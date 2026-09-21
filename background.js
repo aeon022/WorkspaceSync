@@ -17,33 +17,97 @@ if (chrome.sidePanel?.setPanelBehavior) {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 }
 
-// chrome.alarms.create() with an existing name replaces it and restarts its
-// countdown. The service worker's top-level code re-runs on every wake
-// (messages, alarms, etc.), so creating unconditionally could keep pushing
-// the first fire into the future and the alarm might never actually fire.
+async function updateBadgeStatus(handleExists, permissionGranted) {
+  if (!chrome.action) return;
+  if (!handleExists) {
+    await chrome.action.setBadgeText({ text: '' });
+    await chrome.action.setTitle({ title: 'DeckMirror: Setup sync folder in Options' });
+    return;
+  }
+  if (!permissionGranted) {
+    await chrome.action.setBadgeText({ text: '!' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#E53935' });
+    await chrome.action.setTitle({ title: 'DeckMirror: Permission lost. Reconnect in Options.' });
+  } else {
+    await chrome.action.setBadgeText({ text: '' });
+    await chrome.action.setTitle({ title: 'DeckMirror' });
+  }
+}
+
+export async function runSyncCycle() {
+  const handle = await loadHandle();
+  if (!handle) {
+    await updateBadgeStatus(false, false);
+    return;
+  }
+  const hasPerm = await verifyPermission(handle, false);
+  await updateBadgeStatus(true, hasPerm);
+  if (!hasPerm) return;
+
+  await writeSnapshot();
+  await reconcileMirrors();
+  await checkOwnInbox();
+  await rebuildSendToDeviceMenu();
+}
+
+let syncTimeout = null;
+function scheduleSync(delayMs = 1500) {
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => {
+    runSyncCycle().catch((err) => console.warn('[DeckMirror] sync cycle error:', err));
+  }, delayMs);
+}
+
+// Event-based real-time tab listeners
+chrome.tabs.onCreated.addListener(() => scheduleSync(1500));
+chrome.tabs.onRemoved.addListener(() => scheduleSync(1000));
+chrome.tabs.onMoved.addListener(() => scheduleSync(1500));
+chrome.tabs.onAttached?.addListener(() => scheduleSync(1500));
+chrome.tabs.onDetached?.addListener(() => scheduleSync(1500));
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'complete' || changeInfo.url) {
+    scheduleSync(1500);
+  }
+});
+
+// Periodic fallback polling
 chrome.alarms.get(ALARM_NAME, (existing) => {
   if (!existing) chrome.alarms.create(ALARM_NAME, { periodInMinutes: 1 });
 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) return;
-  await writeSnapshot();
-  await reconcileMirrors();
-  await checkOwnInbox();
-  await rebuildSendToDeviceMenu();
+  await runSyncCycle();
 });
+
 chrome.runtime.onInstalled.addListener(async () => {
-  await writeSnapshot();
-  await rebuildSendToDeviceMenu();
+  await runSyncCycle();
 });
 chrome.runtime.onStartup.addListener(async () => {
-  await writeSnapshot();
-  await rebuildSendToDeviceMenu();
+  await runSyncCycle();
+});
+
+// Message handling for UI triggers
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'SYNC_NOW') {
+    runSyncCycle()
+      .then(() => sendResponse({ success: true, timestamp: Date.now() }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true; // Keep channel open for async response
+  }
+  if (message?.type === 'CHECK_STATUS') {
+    loadHandle().then(async (handle) => {
+      const hasPerm = handle ? await verifyPermission(handle, false) : false;
+      await updateBadgeStatus(!!handle, hasPerm);
+      sendResponse({ configured: !!handle, permission: hasPerm });
+    });
+    return true;
+  }
 });
 
 export async function writeSnapshot() {
   const handle = await loadHandle();
-  if (!handle) return; // no sync folder configured yet
-  if (!(await verifyPermission(handle, false))) return; // Task 9 handles surfacing this
+  if (!handle) return;
+  if (!(await verifyPermission(handle, false))) return;
 
   const [device, localWorkspaces, labels, excludedWorkspaces, colors, layer2Names] = await Promise.all([
     getOrCreateDevice(),
@@ -56,10 +120,6 @@ export async function writeSnapshot() {
 
   const { workspaces: previous } = await readOwnPreviousSnapshot(handle, device.id);
 
-  // Excluded workspaces (e.g. "Banking") never leave this device: they're
-  // dropped before writing, not just hidden from other devices' view. If a
-  // workspace was synced before and then excluded, this also removes any
-  // previously-written data for it on the next tick.
   const syncableWorkspaces = localWorkspaces.filter((ws) => !excludedWorkspaces[ws.workspaceId]);
 
   const workspaces = await Promise.all(syncableWorkspaces.map(async (ws) => {
@@ -74,11 +134,6 @@ export async function writeSnapshot() {
 
     return {
       localId: ws.workspaceId,
-      // Layer 2's real Vivaldi workspace name wins when available — that's
-      // the whole point of it (see uimod/deckmirror-uimod.js) — falling
-      // back to whatever the user typed by hand, then whatever was already
-      // written last time, so a workspace never regresses to blank once
-      // it's had a name from either source.
       label: layer2Names[ws.workspaceId] || labels[ws.workspaceId] || prev?.label || '',
       color: colors[ws.workspaceId] || prev?.color || '',
       mirror: await isMirrored(ws.workspaceId),
@@ -109,16 +164,7 @@ export async function reconcileMirrors() {
   const { devices: remoteDevices } = await scanSyncFolder(handle, device.id);
 
   for (const ws of localWorkspaces) {
-    // Excluded workspaces don't sync in either direction: they never send
-    // their own tabs out (handled in writeSnapshot), and they never pull
-    // remote tabs in either — otherwise a "private" workspace could still
-    // be influenced by another device's data despite being excluded.
     if (excludedWorkspaces[ws.workspaceId]) continue;
-    // Same effective-label fallback writeSnapshot() already uses: Layer 2's
-    // real Vivaldi name counts as the label even if the user never
-    // explicitly typed/saved one (the sidepanel input shows it pre-filled,
-    // but that alone never persists it to the labels store - see
-    // sidepanel.js's matching fallback for the same reason).
     const label = layer2Names[ws.workspaceId] || labels[ws.workspaceId];
     if (!label) continue;
     if (!(await isMirrored(ws.workspaceId))) continue;
@@ -130,12 +176,6 @@ export async function reconcileMirrors() {
       const lastTs = await getLastAppliedTs(remoteDevice.deviceId, label);
 
       if (lastTs === 0) {
-        // Never reconciled this remote+label pairing before (e.g. the user
-        // just checked "Mirror" for the first time). Replaying the entire
-        // remote event backlog here could close tabs the user currently has
-        // open, which is exactly the "surprise" the both-sides-opt-in design
-        // was meant to prevent. Instead, just adopt the current cursor
-        // position and start reconciling from here on the next tick.
         const events = remoteWs.recentEvents || [];
         const newestTs = events.length ? Math.max(...events.map((e) => e.ts)) : 0;
         await setLastAppliedTs(remoteDevice.deviceId, label, newestTs);
@@ -144,9 +184,6 @@ export async function reconcileMirrors() {
 
       const { toOpen, toClose, newLastAppliedTs } = computeSyncActions(ws.tabs, remoteWs, lastTs);
 
-      // Internal browser pages (chrome://, vivaldi://, about:blank, ...)
-      // aren't meaningfully mirrorable across devices, and chrome.tabs.create
-      // / chrome.tabs.remove can throw for them — drop them before acting.
       const httpToOpen = toOpen.filter((url) => HTTP_URL.test(url));
       const httpToClose = toClose.filter((url) => HTTP_URL.test(url));
 
@@ -159,25 +196,12 @@ export async function reconcileMirrors() {
       }
 
       if (httpToClose.length) {
-        // chrome.tabs.query({ url }) treats its argument as a match pattern
-        // (not a literal URL) and searches every window/workspace, and this
-        // extension's own tab objects never carry vivExtData/workspaceId
-        // anyway (see lib/workspace.js) - so matching happens against the
-        // Layer 2 files instead, which already have both a tab id and a
-        // resolved workspaceId per tab.
-        //
-        // getLayer2Tabs() can include another device's snapshot (they share
-        // this sync folder — see lib/workspace.js), whose tab ids mean
-        // nothing on this machine and would either fail chrome.tabs.remove
-        // outright or, on a numeric-id coincidence, remove the wrong local
-        // tab. So the id is only ever trusted once it's confirmed against
-        // this device's own currently-open tabs, by both id and url.
         const [candidates, localTabs] = await Promise.all([getLayer2Tabs(), chrome.tabs.query({})]);
         const localById = new Map(localTabs.map((t) => [t.id, t.url]));
         for (const url of httpToClose) {
           const match = candidates.find((t) => t.url === url && t.workspaceId === ws.workspaceId);
-          if (!match) continue; // already gone, in a different workspace, or Layer 2 not active
-          if (localById.get(match.id) !== url) continue; // that id isn't actually this device's open tab
+          if (!match) continue;
+          if (localById.get(match.id) !== url) continue;
           try {
             await chrome.tabs.remove(match.id);
           } catch (err) {
@@ -186,9 +210,6 @@ export async function reconcileMirrors() {
         }
       }
 
-      // Always advance the cursor on a successful reconcile pass, even if
-      // some individual open/close above failed — otherwise a single bad
-      // tab operation would keep the whole pairing retrying forever.
       await setLastAppliedTs(remoteDevice.deviceId, label, newLastAppliedTs);
     }
   }
@@ -237,10 +258,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   });
 });
 
-// Single-slot inbox check: opens a tab another device sent here, once per
-// send. Uses a locally-stored cursor timestamp rather than deleting the
-// inbox file after reading, since deleting would race against another
-// device writing a new send into the same file around the same tick.
 async function checkOwnInbox() {
   const handle = await loadHandle();
   if (!handle || !(await verifyPermission(handle, false))) return;

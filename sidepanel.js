@@ -25,6 +25,33 @@ document.getElementById('optionsBtn').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
 });
 
+const syncNowBtn = document.getElementById('syncNowBtn');
+const syncIcon = document.getElementById('syncIcon');
+
+async function triggerManualSync() {
+  if (!syncNowBtn) return;
+  syncNowBtn.disabled = true;
+  syncIcon?.classList.add('sync-spin');
+
+  try {
+    await chrome.runtime.sendMessage({ type: 'SYNC_NOW' });
+  } catch (err) {
+    console.warn('[DeckMirror] manual sync error:', err);
+  } finally {
+    setTimeout(async () => {
+      syncIcon?.classList.remove('sync-spin');
+      syncNowBtn.disabled = false;
+      await renderLocalWorkspaces();
+      await renderRemoteDevices();
+      await renderFolderBanner();
+    }, 600);
+  }
+}
+
+if (syncNowBtn) {
+  syncNowBtn.addEventListener('click', triggerManualSync);
+}
+
 const localList = document.getElementById('localWorkspaces');
 
 async function collectRemoteLabels() {
@@ -57,7 +84,7 @@ async function renderLocalWorkspaces() {
     note.className = 'muted';
     note.style.fontSize = '11px';
     note.style.margin = '0 0 8px';
-    note.textContent = 'Workspace detection needs setup — see Options. Until then, every tab shows up as one workspace.';
+    note.textContent = 'Workspace detection needs setup — see Options. Until then, tabs appear in one group.';
     localList.append(note);
   }
 
@@ -76,6 +103,7 @@ async function renderLocalWorkspaces() {
     colorPicker.title = currentColor ? 'Workspace color' : 'Set a workspace color';
     colorPicker.addEventListener('change', async () => {
       await setColor(ws.workspaceId, colorPicker.value);
+      chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       renderLocalWorkspaces();
     });
 
@@ -86,16 +114,11 @@ async function renderLocalWorkspaces() {
     input.className = 'ws-name';
     input.placeholder = isDefault ? 'Not in a Vivaldi workspace…' : 'Name this workspace…';
     const currentLabel = labels[ws.workspaceId] || '';
-    // Layer 2's suggested name counts as the effective label even before
-    // the user ever touches this field — matches background.js's
-    // reconcileMirrors, which now falls back to it the same way. Without
-    // this, the input shows the real Vivaldi name pre-filled (looking
-    // already configured) while the Mirror checkbox below stays hidden
-    // because nothing was actually saved to trigger it.
     const effectiveLabel = currentLabel || suggestedNames[ws.workspaceId] || '';
     input.value = effectiveLabel;
     input.addEventListener('change', async () => {
       await setLabel(ws.workspaceId, input.value.trim());
+      chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       renderLocalWorkspaces();
     });
 
@@ -118,6 +141,7 @@ async function renderLocalWorkspaces() {
     syncCheckbox.checked = !isExcluded;
     syncCheckbox.addEventListener('change', async () => {
       await setSyncExcluded(ws.workspaceId, !syncCheckbox.checked);
+      chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       renderLocalWorkspaces();
     });
     syncLabel.append(syncCheckbox, ' Sync');
@@ -136,6 +160,7 @@ async function renderLocalWorkspaces() {
       checkbox.checked = await isMirrored(ws.workspaceId);
       checkbox.addEventListener('change', async () => {
         await setMirrored(ws.workspaceId, checkbox.checked);
+        chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       });
       mirrorLabel.append(checkbox, ' Mirror');
       footer.append(mirrorLabel);
@@ -161,12 +186,6 @@ async function renderLocalWorkspaces() {
 renderLocalWorkspaces();
 chrome.tabs.onCreated.addListener(renderLocalWorkspaces);
 chrome.tabs.onRemoved.addListener(renderLocalWorkspaces);
-// Deliberately no chrome.tabs.onUpdated listener here: it fires many times
-// per page load for every tab (status/title/favicon), and renderLocalWorkspaces
-// does a full sync-folder disk scan plus a DOM rebuild — that would wipe the
-// label input's focus while the user is typing, on any background tab load.
-// onCreated/onRemoved cover the thing that actually matters (workspace tab
-// counts), and the 15s polling below covers eventual title/favicon drift.
 
 const remoteList = document.getElementById('remoteDevices');
 
@@ -259,7 +278,7 @@ async function renderRemoteDevices() {
 }
 
 renderRemoteDevices();
-setInterval(renderRemoteDevices, 15000);
+setInterval(renderRemoteDevices, 10000);
 
 const folderBanner = document.getElementById('folderBanner');
 
@@ -275,11 +294,6 @@ async function renderFolderBanner() {
   }
 
   if (!(await verifyPermission(handle, false))) {
-    // The side panel can't reliably show native permission/picker dialogs
-    // (confirmed by testing - clicking a requestPermission()/
-    // showDirectoryPicker() trigger here does nothing visible, while the
-    // identical call from the Options tab works). Route to Options instead
-    // of attempting it here.
     folderBanner.textContent = 'Sync folder permission was lost. ';
     const btn = document.createElement('button');
     btn.textContent = 'Reconnect in Options';
@@ -290,4 +304,4 @@ async function renderFolderBanner() {
 }
 
 renderFolderBanner();
-setInterval(renderFolderBanner, 15000);
+setInterval(renderFolderBanner, 10000);

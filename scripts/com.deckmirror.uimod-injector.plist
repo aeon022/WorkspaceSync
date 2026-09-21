@@ -6,7 +6,7 @@
   <string>com.deckmirror.uimod-injector</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/gweiher/Developing/Projects/Extensions/WorkspaceSync/scripts/inject-uimod.sh</string>
+    <string>/Users/gweiher/Developing/Projects/Extensions/DeckMirror/scripts/inject-uimod.sh</string>
   </array>
   <key>RunAtLoad</key>
   <true/>

@@ -31,6 +31,10 @@
   const KEY = 'folder';
   const ID_KEY = 'layer2Id';
   const OLD_FILE_NAME = '_layer2.json';
+  const EXTENSION_ID = 'cmjniggmemdcamengapegfpfhdinbejo';
+
+  let extensionEnabled = false;
+  let writeTimeout = null;
 
   function openDb() {
     return new Promise((resolve, reject) => {
@@ -61,9 +65,6 @@
     });
   }
 
-  // Minted once per install, reused forever after - this is what makes the
-  // filename stable across restarts instead of a fresh name (and a fresh
-  // orphaned file) every time this script runs.
   async function getOrCreateLayer2Id() {
     const db = await openDb();
     const existing = await new Promise((resolve, reject) => {
@@ -111,6 +112,32 @@
     return new Promise((resolve) => chrome.tabs.query({}, resolve));
   }
 
+  function checkExtensionEnabled() {
+    if (!chrome?.management) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      chrome.management.get(EXTENSION_ID, (info) => {
+        if (!chrome.runtime?.lastError && info) {
+          resolve(!!info.enabled);
+          return;
+        }
+        if (chrome.management.getAll) {
+          chrome.management.getAll((all) => {
+            if (chrome.runtime?.lastError || !all) {
+              resolve(false);
+              return;
+            }
+            const ext = all.find((e) => e.id === EXTENSION_ID || e.name === 'DeckMirror' || e.name === 'WorkspaceSync');
+            resolve(!!ext?.enabled);
+          });
+        } else {
+          resolve(false);
+        }
+      });
+    });
+  }
+
   let folderHandle = null;
 
   const btn = document.createElement('button');
@@ -122,16 +149,16 @@
   btn.style.fontSize = '11px';
   btn.style.cursor = 'pointer';
   btn.style.transition = 'opacity 0.6s ease';
+  btn.style.display = 'none';
   document.body.appendChild(btn);
 
-  // Success (✅) is transient: pop up to confirm, then fade out — this
-  // button lives fixed in Vivaldi's own browser chrome, not a page or the
-  // extension panel, so leaving it up forever after every 30s sync pulse
-  // would mean a permanent "UU" (the synced folder's name) stuck in the
-  // corner. Error/reconnect states (🔴/🟡) stay visible and clickable
-  // since those need the user to act.
   let hideTimer = null;
   function setStatus(text, autoHide) {
+    if (!extensionEnabled) {
+      btn.style.display = 'none';
+      return;
+    }
+    btn.style.display = '';
     btn.textContent = text;
     clearTimeout(hideTimer);
     btn.style.opacity = '1';
@@ -160,6 +187,7 @@
   btn.addEventListener('click', pickFolder);
 
   async function writeSnapshot() {
+    if (!extensionEnabled) return;
     if (!folderHandle || !(await verifyPermission(folderHandle, false))) return;
     if (!window.vivaldi?.prefs?.get || !chrome?.tabs?.query) return;
 
@@ -190,13 +218,10 @@
       await writable.write(JSON.stringify({ updatedAt: Date.now(), tabs: mappedTabs, workspaceNames }, null, 2));
       await writable.close();
 
-      // One-time cleanup: the old shared filename, if a previous version of
-      // this script left one behind, no longer gets written to and would
-      // otherwise sit there as stale, misleading data indefinitely.
       try {
         await folderHandle.removeEntry(OLD_FILE_NAME);
       } catch {
-        // already gone, or never existed - fine either way
+        // Ignored
       }
 
       setStatus(`✅ DeckMirror: ${folderHandle.name}`, true);
@@ -205,7 +230,32 @@
     }
   }
 
+  function scheduleWriteSnapshot(delayMs = 1000) {
+    if (!extensionEnabled) return;
+    clearTimeout(writeTimeout);
+    writeTimeout = setTimeout(() => {
+      writeSnapshot().catch((err) => console.warn('[DeckMirror UI mod] snapshot failed:', err));
+    }, delayMs);
+  }
+
+  async function updateEnabledState(enabled) {
+    extensionEnabled = enabled;
+    if (!extensionEnabled) {
+      btn.style.display = 'none';
+    } else {
+      btn.style.display = '';
+      await init();
+    }
+  }
+
   async function init() {
+    extensionEnabled = await checkExtensionEnabled();
+    if (!extensionEnabled) {
+      btn.style.display = 'none';
+      return;
+    }
+    btn.style.display = '';
+
     const handle = await loadHandle();
     if (!handle) {
       setStatus('🔴 DeckMirror: click to connect');
@@ -220,6 +270,61 @@
     }
   }
 
+  // Management listeners
+  if (chrome?.management?.onEnabled) {
+    chrome.management.onEnabled.addListener((info) => {
+      if (info.id === EXTENSION_ID || info.name === 'DeckMirror' || info.name === 'WorkspaceSync') {
+        updateEnabledState(true);
+      }
+    });
+  }
+
+  if (chrome?.management?.onDisabled) {
+    chrome.management.onDisabled.addListener((info) => {
+      if (info.id === EXTENSION_ID || info.name === 'DeckMirror' || info.name === 'WorkspaceSync') {
+        updateEnabledState(false);
+      }
+    });
+  }
+
+  if (chrome?.management?.onUninstalled) {
+    chrome.management.onUninstalled.addListener((id) => {
+      if (id === EXTENSION_ID) {
+        updateEnabledState(false);
+      }
+    });
+  }
+
+  if (chrome?.management?.onInstalled) {
+    chrome.management.onInstalled.addListener((info) => {
+      if (info.id === EXTENSION_ID || info.name === 'DeckMirror' || info.name === 'WorkspaceSync') {
+        updateEnabledState(!!info.enabled);
+      }
+    });
+  }
+
+  // Real-time tab events in Vivaldi UI
+  if (chrome?.tabs) {
+    chrome.tabs.onCreated?.addListener(() => scheduleWriteSnapshot(1000));
+    chrome.tabs.onRemoved?.addListener(() => scheduleWriteSnapshot(800));
+    chrome.tabs.onActivated?.addListener(() => scheduleWriteSnapshot(1000));
+    chrome.tabs.onMoved?.addListener(() => scheduleWriteSnapshot(1000));
+    chrome.tabs.onUpdated?.addListener((tabId, changeInfo) => {
+      if (changeInfo.status === 'complete' || changeInfo.url) {
+        scheduleWriteSnapshot(1200);
+      }
+    });
+  }
+
   init();
-  setInterval(writeSnapshot, 30000);
+
+  // Periodic heartbeat
+  setInterval(async () => {
+    const enabled = await checkExtensionEnabled();
+    if (enabled !== extensionEnabled) {
+      await updateEnabledState(enabled);
+    } else if (extensionEnabled) {
+      await writeSnapshot();
+    }
+  }, 30000);
 })();

@@ -7,8 +7,9 @@
   <style>
     body { font: 13px system-ui, sans-serif; margin: 0; padding: 12px; }
     .header-row { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+    .header-actions { display: flex; gap: 6px; align-items: center; }
     h1 { font-size: 14px; margin: 0; }
-    #optionsBtn {
+    .btn-header {
       font-size: 11px;
       padding: 4px 10px;
       cursor: pointer;
@@ -16,15 +17,27 @@
       color: var(--fg);
       border: 1px solid var(--surface-border);
       border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s, border-color 0.15s;
     }
-    #optionsBtn:hover { background: var(--accent-bg); border-color: var(--accent-border); }
+    .btn-header:hover { background: var(--accent-bg); border-color: var(--accent-border); }
+    .btn-header:disabled { opacity: 0.6; cursor: not-allowed; }
     h2 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; letter-spacing: 0.03em; }
+    .sync-spin { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <div class="header-row">
     <h1>DeckMirror</h1>
-    <button id="optionsBtn" title="Options">⚙️ Options</button>
+    <div class="header-actions">
+      <button id="syncNowBtn" class="btn-header" title="Sync now">
+        <span id="syncIcon">🔄</span> Sync now
+      </button>
+      <button id="optionsBtn" class="btn-header" title="Options">⚙️ Options</button>
+    </div>
   </div>
   <div id="folderBanner" class="banner"></div>
   <h2>This device's workspaces</h2>

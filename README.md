@@ -56,7 +56,7 @@ directly into Vivaldi's own UI and writes the tab-to-workspace mapping
 into your sync folder instead, which the extension already has access to.
 
 ```bash
-cd /path/to/WorkspaceSync
+cd /path/to/DeckMirror
 bash scripts/inject-uimod.sh
 ```
 

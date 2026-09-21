@@ -34,6 +34,7 @@ async function init() {
 
 deviceNameInput.addEventListener('change', async () => {
   await setDeviceName(deviceNameInput.value.trim() || deviceNameInput.value);
+  chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
 });
 
 pickFolderBtn.addEventListener('click', async () => {
@@ -48,10 +49,6 @@ pickFolderBtn.addEventListener('click', async () => {
   }
   await saveHandle(handle);
 
-  // Only seed an empty snapshot on genuinely first-time setup. Re-picking
-  // to reconnect an existing setup must never wipe a device's already-synced
-  // workspace data back to empty - the next alarm tick repopulates it for
-  // real via writeSnapshot() either way.
   if (!hadPreviousHandle) {
     const device = await getOrCreateDevice();
     await writeDeviceFile(handle, device.id, {
@@ -62,15 +59,15 @@ pickFolderBtn.addEventListener('click', async () => {
     });
   }
   await refreshFolderStatus();
+  chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
 });
 
 reconnectBtn.addEventListener('click', async () => {
   const handle = await loadHandle();
   if (!handle) return;
-  // Re-grant permission on the SAME already-saved handle - no new folder
-  // selection needed, just the native permission prompt.
   await verifyPermission(handle, true);
   await refreshFolderStatus();
+  chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
 });
 
 init();
