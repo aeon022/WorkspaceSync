@@ -336,19 +336,43 @@ async function renderRemoteDevices() {
     syncedSpan.textContent = device.updatedAt ? formatRelativeSync(device.updatedAt) : '';
     headerRight.append(syncedSpan);
 
+    let deleteConfirming = false;
+    let confirmTimer = null;
+
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn-header';
-    deleteBtn.style.padding = '2px 5px';
+    deleteBtn.style.padding = '2px 6px';
     deleteBtn.style.fontSize = '10px';
     deleteBtn.textContent = '🗑️';
     deleteBtn.title = 'Diesen alten Snapshot aus dem Sync-Ordner löschen';
     deleteBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (confirm(`Alten Snapshot für "${device.deviceName || device.deviceId}" aus dem Sync-Ordner entfernen?`)) {
-        await deleteDeviceFile(handle, device.deviceId);
-        lastRemoteStateKey = '';
-        await renderRemoteDevices();
+      if (!deleteConfirming) {
+        deleteConfirming = true;
+        deleteBtn.textContent = 'Löschen?';
+        deleteBtn.style.background = '#EF4444';
+        deleteBtn.style.color = '#FFFFFF';
+        deleteBtn.style.borderColor = '#DC2626';
+        clearTimeout(confirmTimer);
+        confirmTimer = setTimeout(() => {
+          deleteConfirming = false;
+          deleteBtn.textContent = '🗑️';
+          deleteBtn.style.background = '';
+          deleteBtn.style.color = '';
+          deleteBtn.style.borderColor = '';
+        }, 4000);
+        return;
       }
+
+      deleteBtn.textContent = '⏳';
+      deleteBtn.disabled = true;
+      try {
+        await deleteDeviceFile(handle, device.deviceId);
+      } catch (err) {
+        console.warn('[DeckMirror] delete error:', err);
+      }
+      lastRemoteStateKey = '';
+      await renderRemoteDevices();
     });
     headerRight.append(deleteBtn);
 
