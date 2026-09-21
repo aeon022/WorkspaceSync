@@ -43,11 +43,15 @@ const remoteDeviceCount = document.getElementById('remoteDeviceCount');
 
 let searchQuery = '';
 const collapsedWorkspaces = new Set();
+let lastRemoteStateKey = '';
+let lastLocalStateKey = '';
 
 if (searchInput) {
   searchInput.addEventListener('input', () => {
     searchQuery = searchInput.value.trim().toLowerCase();
     searchClearBtn.style.display = searchQuery ? 'block' : 'none';
+    lastRemoteStateKey = '';
+    lastLocalStateKey = '';
     renderLocalWorkspaces();
     renderRemoteDevices();
   });
@@ -58,6 +62,8 @@ if (searchClearBtn) {
     searchInput.value = '';
     searchQuery = '';
     searchClearBtn.style.display = 'none';
+    lastRemoteStateKey = '';
+    lastLocalStateKey = '';
     renderLocalWorkspaces();
     renderRemoteDevices();
     searchInput.focus();
@@ -77,6 +83,8 @@ async function triggerManualSync() {
     setTimeout(async () => {
       syncIcon?.classList.remove('sync-spin');
       syncNowBtn.disabled = false;
+      lastRemoteStateKey = '';
+      lastLocalStateKey = '';
       await renderLocalWorkspaces();
       await renderRemoteDevices();
       await renderFolderBanner();
@@ -113,7 +121,6 @@ async function renderLocalWorkspaces() {
     getColors(),
     isLayer2Active()
   ]);
-  localList.innerHTML = '';
 
   let totalTabs = 0;
   for (const ws of workspaces) {
@@ -121,13 +128,22 @@ async function renderLocalWorkspaces() {
   }
   if (localTabTotal) localTabTotal.textContent = `${totalTabs} tab${totalTabs === 1 ? '' : 's'}`;
 
+  const stateKey = JSON.stringify({ workspaces, labels, excludedWorkspaces, colors, layer2Active, searchQuery });
+  if (stateKey === lastLocalStateKey) return;
+  lastLocalStateKey = stateKey;
+
+  localList.innerHTML = '';
+
   if (!layer2Active) {
     const note = document.createElement('div');
     note.className = 'empty-state';
-    note.style.border = '1px dashed var(--surface-border)';
+    note.style.border = '1px dashed rgba(52, 211, 153, 0.3)';
+    note.style.background = 'rgba(52, 211, 153, 0.04)';
     note.style.borderRadius = '6px';
     note.style.marginBottom = '8px';
-    note.innerHTML = '⚡ <strong>Layer 2 Hook:</strong> Run <code>bash scripts/inject-uimod.sh</code> for real-time workspace names.';
+    note.style.padding = '8px 10px';
+    note.style.textAlign = 'left';
+    note.innerHTML = '<div style="color:var(--accent); font-weight:600; margin-bottom:2px;">⚡ Workspace-Namen aktivieren:</div><div style="color:var(--fg-secondary); font-size:10px;">Klicke unten rechts in Vivaldi auf den 🔴 DeckMirror-Button und wähle den Sync-Ordner aus.</div>';
     localList.append(note);
   }
 
@@ -138,7 +154,6 @@ async function renderLocalWorkspaces() {
     const effectiveLabel = currentLabel || suggestedNames[ws.workspaceId] || '';
     const isDefault = ws.workspaceId === 'default';
 
-    // Filter by search query if present
     const matchesWorkspaceName = effectiveLabel.toLowerCase().includes(searchQuery);
     const matchingTabs = ws.tabs.filter((t) => {
       if (!searchQuery) return true;
@@ -165,6 +180,7 @@ async function renderLocalWorkspaces() {
     colorPicker.title = 'Workspace color';
     colorPicker.addEventListener('change', async () => {
       await setColor(ws.workspaceId, colorPicker.value);
+      lastLocalStateKey = '';
       chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       renderLocalWorkspaces();
     });
@@ -176,6 +192,7 @@ async function renderLocalWorkspaces() {
     input.value = effectiveLabel;
     input.addEventListener('change', async () => {
       await setLabel(ws.workspaceId, input.value.trim());
+      lastLocalStateKey = '';
       chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       renderLocalWorkspaces();
     });
@@ -204,6 +221,7 @@ async function renderLocalWorkspaces() {
     syncCheckbox.checked = !isExcluded;
     syncCheckbox.addEventListener('change', async () => {
       await setSyncExcluded(ws.workspaceId, !syncCheckbox.checked);
+      lastLocalStateKey = '';
       chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       renderLocalWorkspaces();
     });
@@ -224,6 +242,7 @@ async function renderLocalWorkspaces() {
       checkbox.checked = await isMirrored(ws.workspaceId);
       checkbox.addEventListener('change', async () => {
         await setMirrored(ws.workspaceId, checkbox.checked);
+        lastLocalStateKey = '';
         chrome.runtime.sendMessage({ type: 'SYNC_NOW' }).catch(() => {});
       });
       mirrorLabel.append(checkbox, ' Mirror');
@@ -249,8 +268,14 @@ async function renderLocalWorkspaces() {
 }
 
 renderLocalWorkspaces();
-chrome.tabs.onCreated.addListener(renderLocalWorkspaces);
-chrome.tabs.onRemoved.addListener(renderLocalWorkspaces);
+chrome.tabs.onCreated.addListener(() => {
+  lastLocalStateKey = '';
+  renderLocalWorkspaces();
+});
+chrome.tabs.onRemoved.addListener(() => {
+  lastLocalStateKey = '';
+  renderLocalWorkspaces();
+});
 
 const remoteList = document.getElementById('remoteDevices');
 
@@ -266,11 +291,16 @@ async function renderRemoteDevices() {
   }
 
   const { devices, pending } = await scanSyncFolder(handle, (await getOrCreateDevice()).id);
-  remoteList.innerHTML = '';
 
   if (remoteDeviceCount) {
     remoteDeviceCount.textContent = `${devices.length} device${devices.length === 1 ? '' : 's'}`;
   }
+
+  const stateKey = JSON.stringify({ devices, pending, searchQuery });
+  if (stateKey === lastRemoteStateKey) return;
+  lastRemoteStateKey = stateKey;
+
+  remoteList.innerHTML = '';
 
   for (const name of pending) {
     const p = document.createElement('div');

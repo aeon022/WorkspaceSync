@@ -218,27 +218,49 @@ export async function reconcileMirrors() {
 const SEND_MENU_PARENT_ID = 'workspacesync-send-parent';
 const SEND_MENU_PREFIX = 'workspacesync-send-to-';
 
+let isRebuildingMenu = false;
+let queuedMenuRebuild = false;
+
 async function rebuildSendToDeviceMenu() {
-  const handle = await loadHandle();
-  await new Promise((resolve) => chrome.contextMenus.removeAll(resolve));
-  if (!handle || !(await verifyPermission(handle, false))) return;
+  if (isRebuildingMenu) {
+    queuedMenuRebuild = true;
+    return;
+  }
+  isRebuildingMenu = true;
 
-  const device = await getOrCreateDevice();
-  const { devices: remoteDevices } = await scanSyncFolder(handle, device.id);
-  if (remoteDevices.length === 0) return;
+  try {
+    const handle = await loadHandle();
+    await new Promise((resolve) => chrome.contextMenus.removeAll(resolve));
+    if (!handle || !(await verifyPermission(handle, false))) return;
 
-  chrome.contextMenus.create({
-    id: SEND_MENU_PARENT_ID,
-    title: 'Send tab to device',
-    contexts: ['page']
-  });
-  for (const remote of remoteDevices) {
+    const device = await getOrCreateDevice();
+    const { devices: remoteDevices } = await scanSyncFolder(handle, device.id);
+    if (remoteDevices.length === 0) return;
+
     chrome.contextMenus.create({
-      id: `${SEND_MENU_PREFIX}${remote.deviceId}`,
-      parentId: SEND_MENU_PARENT_ID,
-      title: remote.deviceName || remote.deviceId,
+      id: SEND_MENU_PARENT_ID,
+      title: 'Send tab to device',
       contexts: ['page']
+    }, () => {
+      if (chrome.runtime?.lastError) { /* ignore race condition */ }
     });
+
+    for (const remote of remoteDevices) {
+      chrome.contextMenus.create({
+        id: `${SEND_MENU_PREFIX}${remote.deviceId}`,
+        parentId: SEND_MENU_PARENT_ID,
+        title: remote.deviceName || remote.deviceId,
+        contexts: ['page']
+      }, () => {
+        if (chrome.runtime?.lastError) { /* ignore race condition */ }
+      });
+    }
+  } finally {
+    isRebuildingMenu = false;
+    if (queuedMenuRebuild) {
+      queuedMenuRebuild = false;
+      setTimeout(rebuildSendToDeviceMenu, 100);
+    }
   }
 }
 

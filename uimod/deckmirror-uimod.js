@@ -142,13 +142,20 @@
 
   const btn = document.createElement('button');
   btn.style.position = 'fixed';
-  btn.style.bottom = '12px';
-  btn.style.right = '12px';
-  btn.style.zIndex = '999999';
-  btn.style.padding = '6px 10px';
+  btn.style.bottom = '16px';
+  btn.style.right = '16px';
+  btn.style.zIndex = '9999999';
+  btn.style.padding = '6px 12px';
   btn.style.fontSize = '11px';
+  btn.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  btn.style.fontWeight = '600';
+  btn.style.background = '#0F1118';
+  btn.style.color = '#F1F5F9';
+  btn.style.border = '1px solid #34D399';
+  btn.style.borderRadius = '8px';
+  btn.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.6), 0 0 10px rgba(52, 211, 153, 0.2)';
   btn.style.cursor = 'pointer';
-  btn.style.transition = 'opacity 0.6s ease';
+  btn.style.transition = 'all 0.3s ease';
   btn.style.display = 'none';
   document.body.appendChild(btn);
 

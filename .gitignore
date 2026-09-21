@@ -1,2 +1,4 @@
 wsync-signing-key.pem
 .keys/
+landingpage/node_modules/
+landingpage/dist/
